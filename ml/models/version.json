@@ -1,0 +1,56 @@
+{
+  "version": "1.0.0",
+  "training_date": "2026-04-30T22:50:01.168464",
+  "models": {
+    "placement_3m": {
+      "type": "XGBoostClassifier",
+      "file": "placement_model_3m.pkl",
+      "metrics": {
+        "auc_roc": 0.8262060207736563,
+        "f1": 0.8594377510040161,
+        "precision": 0.8178343949044586,
+        "recall": 0.9055007052186178
+      }
+    },
+    "placement_6m": {
+      "type": "XGBoostClassifier",
+      "file": "placement_model_6m.pkl",
+      "metrics": {
+        "auc_roc": 0.8888809854062193,
+        "f1": 0.9542553191489361,
+        "precision": 0.9218910585817061,
+        "recall": 0.9889746416758545
+      }
+    },
+    "placement_12m": {
+      "type": "XGBoostClassifier",
+      "file": "placement_model_12m.pkl",
+      "metrics": {
+        "auc_roc": 0.9263803680981595,
+        "f1": 0.9888663967611336,
+        "precision": 0.9789579158316634,
+        "recall": 0.9989775051124744
+      }
+    },
+    "salary": {
+      "type": "Ridge",
+      "file": "salary_model.pkl",
+      "metrics": {
+        "mae": 2.2167773946484997,
+        "rmse": 3.0508538546798083,
+        "r2": 0.5502476597311851
+      }
+    }
+  },
+  "feature_engineering": {
+    "n_features": 16,
+    "feature_names_file": "feature_names.json"
+  },
+  "training_config": {
+    "data_source": "synthetic",
+    "n_records": 5000,
+    "train_test_split": 0.8,
+    "cv_folds": 5,
+    "random_seed": 42
+  }
+}

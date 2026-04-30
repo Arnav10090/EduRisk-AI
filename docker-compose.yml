@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: edurisk-postgres
+    environment:
+      POSTGRES_USER: edurisk
+      POSTGRES_PASSWORD: edurisk_password
+      POSTGRES_DB: edurisk_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U edurisk"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - edurisk-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: edurisk-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - edurisk-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    container_name: edurisk-backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://edurisk:edurisk_password@postgres:5432/edurisk_db
+      REDIS_URL: redis://redis:6379/0
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ML_MODEL_PATH: /app/ml/models
+      SECRET_KEY: ${SECRET_KEY:-dev_secret_key_change_in_production}
+      CORS_ORIGINS: http://localhost:3000,http://frontend:3000
+      DEBUG: ${DEBUG:-True}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ml/models:/app/ml/models:ro
+      - ./backend:/app/backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - edurisk-network
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/Dockerfile.frontend
+    container_name: edurisk-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    networks:
+      - edurisk-network
+    command: npm run dev
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  edurisk-network:
+    driver: bridge

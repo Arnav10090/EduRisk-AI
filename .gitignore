@@ -1,0 +1,611 @@
+# ============================================
+# EduRisk AI - Placement Risk Intelligence
+# .gitignore for Python/FastAPI + Next.js + ML
+# ============================================
+
+# ============================================
+# Python
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv/
+.virtualenv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Distribution / Packaging
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+wheels/
+*.whl
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+nosetests.xml
+test-results/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# pyenv
+.python-version
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# ============================================
+# ML Models and Data
+# ============================================
+# Trained models - ignore all model binaries
+ml/models/*.pkl
+ml/models/*.joblib
+ml/models/*.h5
+ml/models/*.pt
+ml/models/*.pth
+ml/models/*.onnx
+ml/models/*.pb
+
+# But keep these metadata files (use ! to negate)
+!ml/models/version.json
+!ml/models/feature_names.json
+!ml/models/training_metrics.json
+!ml/models/salary_metrics.json
+!ml/models/.gitkeep
+
+# Data files
+ml/data/synthetic/*.csv
+ml/data/raw/*.csv
+ml/data/processed/*.csv
+ml/data/external/*.csv
+ml/data/**/*.parquet
+ml/data/**/*.feather
+
+# Keep .gitkeep files
+!ml/data/**/.gitkeep
+
+# ML experiment tracking
+mlruns/
+runs/
+wandb/
+.neptune/
+
+# Model checkpoints
+checkpoints/
+*.ckpt
+
+# SHAP plots and visualizations
+ml/reports/figures/*.png
+ml/reports/figures/*.jpg
+ml/reports/*.html
+
+# Optuna database
+optuna.db
+
+# ============================================
+# Environment Variables & Secrets
+# ============================================
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+
+# API Keys and Secrets
+secrets/
+*.key
+*.pem
+*.crt
+*.p12
+config.json
+backend/config.json
+
+# Keep example files
+!.env.example
+!backend/.env.example
+!frontend/.env.example
+!backend/config.example.json
+
+# ============================================
+# Database
+# ============================================
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-shm
+*.db-wal
+
+# PostgreSQL
+*.dump
+*.sql.gz
+
+# Redis
+dump.rdb
+
+# ============================================
+# Next.js / Frontend
+# ============================================
+# Dependencies
+frontend/node_modules/
+node_modules/
+jspm_packages/
+
+# Next.js build output
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.turbo
+
+# Production build
+frontend/dist/
+
+# Cache
+frontend/.cache/
+.eslintcache
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# ============================================
+# Logs
+# ============================================
+*.log
+logs/
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# ============================================
+# IDEs and Editors
+# ============================================
+# VSCode
+.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains IDEs (PyCharm, WebStorm, IntelliJ)
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Vim
+*.swp
+*.swo
+*~
+.vim/
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ============================================
+# Operating System
+# ============================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+.directory
+.Trash-*
+.nfs*
+
+# ============================================
+# Docker
+# ============================================
+docker-compose.override.yml
+.dockerignore
+
+# ============================================
+# Alembic (Database Migrations)
+# ============================================
+backend/alembic/versions/*.pyc
+backend/alembic/__pycache__/
+
+# Keep migration files
+!backend/alembic/versions/*.py
+
+# ============================================
+# Redis
+# ============================================
+dump.rdb
+appendonly.aof
+
+# ============================================
+# Temporary Files
+# ============================================
+*.tmp
+*.temp
+*.bak
+*.backup
+*.swp
+*.swo
+*~
+
+# ============================================
+# Coverage Reports
+# ============================================
+htmlcov/
+.coverage
+.coverage.*
+coverage/
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# ============================================
+# Documentation Build
+# ============================================
+docs/_build/
+docs/.doctrees/
+site/
+
+# ============================================
+# Package Manager Locks (Optional)
+# ============================================
+# Uncomment if you want to ignore lock files
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+# poetry.lock
+# Pipfile.lock
+
+# ============================================
+# Miscellaneous
+# ============================================
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Compressed files
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Large files
+*.mp4
+*.avi
+*.mov
+*.wmv
+
+# ============================================
+# Project Specific - EduRisk AI
+# ============================================
+# Task summaries (optional - uncomment if you don't want to track these)
+# backend/TASK_*_SUMMARY.md
+# backend/TASK_*_IMPLEMENTATION_SUMMARY.md
+
+# Local development overrides
+local/
+.local/
+
+# Temporary test data
+test_data/
+tmp/
+temp/
+
+# Performance profiling
+*.prof
+*.lprof
+
+# Anthropic API cache
+.anthropic/
+
+# FastAPI cache
+.fastapi_cache/
+
+# Uvicorn PID files
+uvicorn.pid
+
+# Redis CLI history
+.rediscli_history
+
+# PostgreSQL history
+.psql_history
+
+# Python REPL history
+.python_history
+
+# IPython
+.ipython/
+profile_default/
+
+# Pytest
+.pytest_cache/
+pytestdebug.log
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+
+# Hypothesis
+.hypothesis/
+
+# Ruff cache
+.ruff_cache/
+
+# Black cache
+.black/
+
+# isort cache
+.isort.cfg
+
+# Bandit
+.bandit
+
+# Safety
+.safety/
+
+# Local scripts
+scripts/local/
+*.local.sh
+*.local.py
+
+# Development databases
+dev.db
+dev.sqlite
+test.db
+test.sqlite
+
+# Backup files from editors
+*~
+*.swp
+*.swo
+*.swn
+.*.sw?
+
+# macOS specific
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Windows specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux specific
+.directory
+*~
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+*.ipynb
+
+# VS Code workspace settings (keep shared settings)
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Tags
+TAGS
+tags
+.tags
+.tags1
+
+# CTags
+tags.lock
+tags.temp
+
+# GNU Global
+GPATH
+GRTAGS
+GSYMS
+GTAGS
+
+# Cscope
+cscope.files
+cscope.out
+cscope.in.out
+cscope.po.out
+
+# ============================================
+# Keep Important Files
+# ============================================
+# Ensure these are NOT ignored
+!.gitkeep
+!.gitignore
+!README.md
+!requirements.txt
+!package.json
+!docker-compose.yml
+!Dockerfile
+!.dockerignore
+!pyproject.toml
+!setup.py
+!setup.cfg
+!MANIFEST.in
+!LICENSE
+!.editorconfig
+!.pre-commit-config.yaml
+
+# ============================================
+# Additional Exclusions
+# ============================================
+# Ignore everything in data directories except .gitkeep
+ml/data/synthetic/*
+!ml/data/synthetic/.gitkeep
+
+ml/data/raw/*
+!ml/data/raw/.gitkeep
+
+ml/data/processed/*
+!ml/data/processed/.gitkeep
+
+ml/data/external/*
+!ml/data/external/.gitkeep
+
+# Ignore reports but keep structure
+ml/reports/figures/*
+!ml/reports/figures/.gitkeep
+
+# Ignore logs but keep directory
+logs/*
+!logs/.gitkeep
+
+# Ignore uploads but keep directory
+uploads/*
+!uploads/.gitkeep
+
+# Ignore downloads but keep directory
+downloads/*
+!downloads/.gitkeep
+
+# ============================================
+# Security - Double Check
+# ============================================
+# Ensure these are NEVER committed
+**/.env
+**/.env.local
+**/.env.*.local
+**/config.json
+**/*.key
+**/*.pem
+**/*.p12
+**/*.pfx
+**/secrets.json
+**/credentials.json
+**/*_rsa
+**/*_dsa
+**/*_ecdsa
+**/*_ed25519
+**/.aws/
+**/.azure/
+**/.gcloud/
+
+# ============================================
+# End of .gitignore
+# ============================================

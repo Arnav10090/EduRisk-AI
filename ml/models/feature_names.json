@@ -1,0 +1,29 @@
+{
+  "feature_names": [
+    "cgpa_normalized",
+    "internship_score",
+    "employer_type_score",
+    "certifications",
+    "institute_tier_1",
+    "institute_tier_2",
+    "institute_tier_3",
+    "course_type_encoded",
+    "placement_rate_3m",
+    "placement_rate_6m",
+    "salary_benchmark",
+    "job_demand_score",
+    "region_job_density",
+    "macro_hiring_index",
+    "skill_gap_score",
+    "emi_stress_ratio"
+  ],
+  "n_features": 16,
+  "description": "Feature names for EduRisk AI placement prediction models",
+  "excluded_features": [
+    "gender",
+    "religion",
+    "caste",
+    "state_of_origin"
+  ],
+  "note": "Demographic features are excluded from all ML models per Requirement 16.1-16.3"
+}

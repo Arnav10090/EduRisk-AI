@@ -1,0 +1,95 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "edurisk-ai"
+version = "1.0.0"
+description = "AI-powered placement risk assessment for education loan lenders"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "Proprietary"}
+authors = [
+    {name = "EduRisk AI Team"}
+]
+keywords = ["machine-learning", "risk-assessment", "education", "placement-prediction"]
+
+dependencies = [
+    "fastapi==0.111.0",
+    "uvicorn[standard]==0.30.1",
+    "python-multipart==0.0.9",
+    "sqlalchemy==2.0.30",
+    "asyncpg==0.29.0",
+    "alembic==1.13.1",
+    "psycopg2-binary==2.9.9",
+    "pydantic==2.7.4",
+    "pydantic-settings==2.3.3",
+    "xgboost==2.0.3",
+    "scikit-learn==1.5.0",
+    "numpy==1.26.4",
+    "pandas==2.2.2",
+    "scipy==1.13.1",
+    "shap==0.44.1",
+    "anthropic==0.28.0",
+    "redis==5.0.4",
+    "hiredis==2.3.2",
+    "fairlearn==0.10.0",
+    "optuna==3.6.1",
+    "python-dotenv==1.0.1",
+    "python-jose[cryptography]==3.3.0",
+    "passlib[bcrypt]==1.7.4",
+    "httpx==0.27.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.2.2",
+    "pytest-asyncio==0.23.7",
+    "pytest-cov==5.0.0",
+    "black==24.4.2",
+    "flake8==7.0.0",
+    "mypy==1.10.0",
+    "isort==5.13.2",
+]
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests", "ml/tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --cov=backend --cov=ml --cov-report=html --cov-report=term"
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
