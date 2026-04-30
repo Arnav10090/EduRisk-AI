@@ -1,0 +1,24 @@
+# Development override for docker-compose.yml
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  backend:
+    volumes:
+      - ./backend:/app/backend
+      - ./ml:/app/ml
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      DEBUG: "True"
+      LOG_LEVEL: DEBUG
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/Dockerfile.frontend.dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000

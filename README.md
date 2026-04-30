@@ -1,75 +1,75 @@
 # EduRisk AI - Placement Risk Intelligence
 
-AI-powered placement risk assessment platform for education loan lenders. Built for the TenzorX 2026 Poonawalla Fincorp National AI Hackathon.
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.111.0-009688.svg)](https://fastapi.tiangolo.com)
+[![Next.js 14](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-## Overview
+AI-powered placement risk assessment system for education loan lenders. Built for the TenzorX 2026 Poonawalla Fincorp National AI Hackathon.
 
-EduRisk AI predicts student placement probability within 3, 6, and 12 months post-graduation, estimates salary ranges, calculates composite risk scores, and provides actionable intervention recommendations. The system uses XGBoost classifiers, SHAP explainability, and Claude AI for natural language summaries.
+## 🎯 Overview
 
-## Architecture
+EduRisk AI predicts student placement outcomes and generates actionable risk assessments for education loan lenders. The system provides:
 
-- **ML Pipeline**: Python-based feature engineering, XGBoost models, SHAP explanations
-- **Backend API**: FastAPI with async SQLAlchemy, PostgreSQL, Redis
-- **Frontend**: Next.js 14 with TypeScript, Tailwind CSS, shadcn/ui
-- **Deployment**: Docker Compose orchestration
+- **Placement Timeline Predictions**: 3-month, 6-month, and 12-month placement probabilities
+- **Salary Range Estimates**: Expected starting salary with confidence intervals
+- **Risk Scoring**: Composite risk scores (0-100) with categorical levels (Low/Medium/High)
+- **SHAP Explainability**: Transparent feature attributions for every prediction
+- **AI-Generated Summaries**: Natural language risk explanations via Claude API
+- **Actionable Recommendations**: Personalized intervention suggestions
+- **Compliance Audit Trails**: Complete logging for RBI regulatory requirements
 
-## Technology Stack
-
-### Backend & ML
-- FastAPI 0.111 - Async API framework
-- SQLAlchemy 2.0 - Async ORM
-- PostgreSQL 16 - Primary database
-- Redis 7 - Caching and rate limiting
-- XGBoost 2.0 - Placement prediction models
-- SHAP 0.44 - Model explainability
-- Anthropic Claude API - AI summaries
-- Fairlearn - Bias auditing
-
-### Frontend
-- Next.js 14 (App Router) - React framework
-- TypeScript - Type safety
-- Tailwind CSS - Styling
-- shadcn/ui - UI components
-- Recharts - Data visualization
-- SWR - Data fetching
-
-## Project Structure
+## 🏗️ Architecture
 
 ```
-edurisk-ai/
-├── ml/                          # ML Pipeline
-│   ├── pipeline/                # Feature engineering, training, prediction
-│   ├── models/                  # Trained model artifacts
-│   └── data/                    # Training data
-├── backend/                     # FastAPI Backend
-│   ├── api/                     # API routes
-│   ├── models/                  # SQLAlchemy ORM models
-│   ├── schemas/                 # Pydantic schemas
-│   ├── services/                # Business logic
-│   ├── db/                      # Database configuration
-│   └── middleware/              # Rate limiting, CORS
-├── frontend/                    # Next.js Frontend
-│   ├── app/                     # App router pages
-│   ├── components/              # React components
-│   └── lib/                     # Utilities
-├── docker/                      # Docker configuration
-│   ├── Dockerfile.backend
-│   └── Dockerfile.frontend
-├── docker-compose.yml           # Service orchestration
-└── requirements.txt             # Python dependencies
+┌─────────────────────────────────────────────────────────────┐
+│                    Frontend (Next.js 14)                     │
+│  Dashboard • Student Detail • New Prediction • Alerts        │
+└────────────────────────┬────────────────────────────────────┘
+                         │ HTTP/REST API
+┌────────────────────────┴────────────────────────────────────┐
+│                  Backend API (FastAPI)                       │
+│  Prediction Service • LLM Service • Action Recommender       │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+        ┌────────────────┴────────────────┐
+        │                                 │
+┌───────▼────────┐              ┌─────────▼────────┐
+│ PostgreSQL 16  │              │    Redis 7       │
+│ + Alembic      │              │  Rate Limiting   │
+└────────────────┘              └──────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│              ML Pipeline (XGBoost + SHAP)                    │
+│  Feature Engineering • Placement Models • Salary Model       │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Setup Instructions
+### Technology Stack
+
+| Component | Technology | Version |
+|-----------|-----------|---------|
+| ML Models | XGBoost | 2.0.3 |
+| Explainability | SHAP | 0.44.1 |
+| Backend API | FastAPI | 0.111.0 |
+| Database | PostgreSQL | 16 |
+| ORM | SQLAlchemy | 2.0.30 |
+| Cache | Redis | 7 |
+| LLM | Anthropic Claude Sonnet 4 | Latest |
+| Frontend | Next.js | 14 |
+| UI Components | shadcn/ui + Tailwind CSS | Latest |
+| Containerization | Docker + Docker Compose | Latest |
+
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Python 3.11+
-- Node.js 20+
-- Docker & Docker Compose (for containerized setup)
-- PostgreSQL 16 (for local development)
-- Redis 7 (for local development)
+- **Docker** (20.10+) and **Docker Compose** (2.0+)
+- **Anthropic API Key** (for AI summaries)
+- **8GB RAM** minimum
+- **10GB disk space** for Docker images and data
 
-### Option 1: Docker Setup (Recommended)
+### Installation
 
 1. **Clone the repository**
    ```bash
@@ -77,185 +77,436 @@ edurisk-ai/
    cd edurisk-ai
    ```
 
-2. **Configure environment variables**
+2. **Set up environment variables**
    ```bash
-   # Backend
-   cp backend/.env.example backend/.env
-   # Edit backend/.env and add your ANTHROPIC_API_KEY
+   cp .env.example .env
+   ```
    
-   # Frontend
-   cp frontend/.env.example frontend/.env
+   Edit `.env` and configure:
+   ```env
+   ANTHROPIC_API_KEY=your_anthropic_api_key_here
+   SECRET_KEY=your_secret_key_here
+   DATABASE_URL=postgresql+asyncpg://edurisk:edurisk_password@postgres:5432/edurisk_db
+   REDIS_URL=redis://redis:6379/0
    ```
 
-3. **Start all services**
+3. **Validate setup**
+   ```bash
+   chmod +x docker/validate-setup.sh
+   ./docker/validate-setup.sh
+   ```
+
+4. **Start the application**
    ```bash
    docker-compose up -d
    ```
+   
+   This will:
+   - Start PostgreSQL database
+   - Start Redis cache
+   - Run database migrations
+   - Start FastAPI backend on port 8000
+   - Start Next.js frontend on port 3000
 
-4. **Run database migrations**
+5. **Verify deployment**
    ```bash
-   docker-compose exec backend alembic upgrade head
+   # Check service health
+   curl http://localhost:8000/api/health
+   
+   # Or run integration tests
+   python test_integration.py
    ```
 
-5. **Access the application**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8000
-   - API Docs: http://localhost:8000/docs
+6. **Access the application**
+   - **Frontend**: http://localhost:3000
+   - **API Documentation**: http://localhost:8000/docs
+   - **API Alternative Docs**: http://localhost:8000/redoc
 
-### Option 2: Local Development Setup
+### Development Mode
 
-#### Backend Setup
-
-1. **Create Python virtual environment**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-2. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Configure environment**
-   ```bash
-   cp backend/.env.example backend/.env
-   # Edit backend/.env with your database and API credentials
-   ```
-
-4. **Start PostgreSQL and Redis**
-   ```bash
-   # Using Docker
-   docker run -d -p 5432:5432 -e POSTGRES_USER=edurisk -e POSTGRES_PASSWORD=edurisk_password -e POSTGRES_DB=edurisk_db postgres:16-alpine
-   docker run -d -p 6379:6379 redis:7-alpine
-   ```
-
-5. **Run database migrations**
-   ```bash
-   cd backend
-   alembic upgrade head
-   ```
-
-6. **Start the backend server**
-   ```bash
-   uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
-   ```
-
-#### Frontend Setup
-
-1. **Install dependencies**
-   ```bash
-   cd frontend
-   npm install
-   ```
-
-2. **Configure environment**
-   ```bash
-   cp .env.example .env
-   # Edit .env if needed (default points to localhost:8000)
-   ```
-
-3. **Start the development server**
-   ```bash
-   npm run dev
-   ```
-
-4. **Access the application**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8000/docs
-
-## ML Model Training
-
-Before running predictions, you need to train the ML models:
+For hot-reload during development:
 
 ```bash
-# Generate synthetic training data
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
+## 📚 Documentation
+
+### Setup Instructions
+
+See [DOCKER_QUICKSTART.md](DOCKER_QUICKSTART.md) for detailed Docker setup instructions.
+
+### API Endpoints
+
+#### Prediction Endpoints
+
+**POST /api/predict** - Single student prediction
+```bash
+curl -X POST http://localhost:8000/api/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John Doe",
+    "course_type": "Engineering",
+    "institute_tier": 2,
+    "institute_name": "ABC Institute",
+    "cgpa": 8.5,
+    "cgpa_scale": 10.0,
+    "year_of_grad": 2025,
+    "internship_count": 2,
+    "internship_months": 6,
+    "internship_employer_type": "MNC",
+    "certifications": 3,
+    "region": "Mumbai",
+    "loan_amount": 500000.0,
+    "loan_emi": 15000.0
+  }'
+```
+
+**Response:**
+```json
+{
+  "student_id": "uuid",
+  "prediction_id": "uuid",
+  "risk_score": 45,
+  "risk_level": "medium",
+  "prob_placed_3m": 0.6234,
+  "prob_placed_6m": 0.7891,
+  "prob_placed_12m": 0.8567,
+  "placement_label": "placed_3m",
+  "salary_min": 4.5,
+  "salary_max": 6.8,
+  "salary_confidence": 85.5,
+  "emi_affordability": 0.32,
+  "top_risk_drivers": [...],
+  "ai_summary": "Medium risk student...",
+  "next_best_actions": [...]
+}
+```
+
+**POST /api/batch-score** - Batch prediction (max 500 students)
+```bash
+curl -X POST http://localhost:8000/api/batch-score \
+  -H "Content-Type: application/json" \
+  -d '{
+    "students": [
+      { "name": "Student 1", ... },
+      { "name": "Student 2", ... }
+    ]
+  }'
+```
+
+#### Query Endpoints
+
+**GET /api/explain/{student_id}** - Get SHAP explanation
+```bash
+curl http://localhost:8000/api/explain/{student_id}
+```
+
+**GET /api/students** - List all students
+```bash
+# With pagination and search
+curl "http://localhost:8000/api/students?search=John&limit=20&offset=0&sort=risk_score&order=desc"
+```
+
+**GET /api/alerts** - Get high-risk alerts
+```bash
+curl "http://localhost:8000/api/alerts?threshold=high&limit=50"
+```
+
+**GET /api/health** - Health check
+```bash
+curl http://localhost:8000/api/health
+```
+
+### Environment Variables
+
+#### Backend Configuration
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql+asyncpg://...` | Yes |
+| `REDIS_URL` | Redis connection string | `redis://redis:6379/0` | Yes |
+| `ANTHROPIC_API_KEY` | Anthropic API key for Claude | - | Yes |
+| `ML_MODEL_PATH` | Path to ML models directory | `/app/ml/models` | Yes |
+| `SECRET_KEY` | Secret key for JWT tokens | - | Yes |
+| `CORS_ORIGINS` | Allowed CORS origins | `http://localhost:3000` | No |
+| `DEBUG` | Enable debug mode | `True` | No |
+| `LOG_LEVEL` | Logging level | `INFO` | No |
+| `LOG_JSON_FORMAT` | Use JSON logging | `True` | No |
+
+#### Frontend Configuration
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `NEXT_PUBLIC_API_URL` | Backend API URL | `http://localhost:8000` | Yes |
+
+### Database Schema
+
+#### students Table
+```sql
+CREATE TABLE students (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    course_type VARCHAR(100) NOT NULL,
+    institute_name VARCHAR(255),
+    institute_tier INTEGER NOT NULL CHECK (institute_tier BETWEEN 1 AND 3),
+    cgpa DECIMAL(4,2) CHECK (cgpa >= 0),
+    cgpa_scale DECIMAL(4,2) DEFAULT 10.0,
+    year_of_grad INTEGER NOT NULL CHECK (year_of_grad BETWEEN 2020 AND 2030),
+    internship_count INTEGER DEFAULT 0,
+    internship_months INTEGER DEFAULT 0,
+    internship_employer_type VARCHAR(100),
+    certifications INTEGER DEFAULT 0,
+    region VARCHAR(100),
+    loan_amount DECIMAL(12,2),
+    loan_emi DECIMAL(10,2),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+#### predictions Table
+```sql
+CREATE TABLE predictions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    model_version VARCHAR(50) NOT NULL,
+    prob_placed_3m DECIMAL(5,4) NOT NULL,
+    prob_placed_6m DECIMAL(5,4) NOT NULL,
+    prob_placed_12m DECIMAL(5,4) NOT NULL,
+    placement_label VARCHAR(50) NOT NULL,
+    risk_score INTEGER NOT NULL CHECK (risk_score BETWEEN 0 AND 100),
+    risk_level VARCHAR(20) NOT NULL,
+    salary_min DECIMAL(10,2),
+    salary_max DECIMAL(10,2),
+    salary_confidence DECIMAL(4,2),
+    emi_affordability DECIMAL(5,2),
+    shap_values JSONB NOT NULL,
+    top_risk_drivers JSONB NOT NULL,
+    ai_summary TEXT,
+    next_best_actions JSONB NOT NULL,
+    alert_triggered BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+#### audit_logs Table
+```sql
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID REFERENCES students(id) ON DELETE SET NULL,
+    prediction_id UUID REFERENCES predictions(id) ON DELETE SET NULL,
+    action VARCHAR(50) NOT NULL,
+    performed_by VARCHAR(255),
+    metadata JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+## 🔧 Development
+
+### Running Tests
+
+```bash
+# Backend unit tests
+cd backend
+pytest
+
+# Backend integration tests
+pytest test_endpoints.py
+
+# Full integration test
+python test_integration.py
+
+# Frontend tests
+cd frontend
+npm test
+```
+
+### Database Migrations
+
+```bash
+# Create a new migration
+cd backend
+alembic revision --autogenerate -m "Description"
+
+# Apply migrations
+alembic upgrade head
+
+# Rollback migration
+alembic downgrade -1
+```
+
+### ML Model Training
+
+```bash
+# Generate synthetic data
 python ml/data/generate_synthetic.py
 
-# Train placement models (3m, 6m, 12m)
+# Train models
 python ml/pipeline/train.py
-
-# Train salary model
-python ml/pipeline/salary_model.py
 
 # Run bias audit
 python ml/pipeline/bias_audit.py
 ```
 
-Models will be saved to `ml/models/` directory.
+## 📊 ML Pipeline
 
-## API Endpoints
+### Feature Engineering
 
-### Prediction
-- `POST /api/predict` - Single student prediction
-- `POST /api/batch-score` - Batch student scoring (max 500)
+The system uses 16 engineered features:
 
-### Retrieval
-- `GET /api/explain/{student_id}` - SHAP explanation
-- `GET /api/alerts` - High-risk student alerts
-- `GET /api/students` - Student list with filters
+1. **cgpa_normalized**: CGPA scaled to 0-1 range
+2. **internship_score**: Composite score from count, duration, employer type
+3. **employer_type_score**: MNC=4, Startup=3, PSU=2, NGO=1
+4. **certifications**: Number of certifications (capped at 5)
+5-7. **institute_tier_1/2/3**: One-hot encoded tier
+8. **course_type_encoded**: Label encoded course type
+9-11. **placement_rate_3m/6m/12m**: Historical institute rates
+12. **salary_benchmark**: Institute historical salary
+13. **job_demand_score**: Sector demand index (1-10)
+14. **region_job_density**: Regional job market density
+15. **macro_hiring_index**: Economic hiring indicator (0-1)
+16. **skill_gap_score**: Derived gap metric
 
-### System
-- `GET /api/health` - Health check
+**Excluded Features**: gender, religion, caste, state_of_origin (for fairness)
 
-See full API documentation at http://localhost:8000/docs
+### Models
 
-## Configuration
+- **Placement Models**: 3 XGBoost classifiers (3m, 6m, 12m windows)
+- **Salary Model**: Ridge regression with StandardScaler
+- **Explainability**: SHAP TreeExplainer for feature attributions
 
-### Backend Environment Variables
+### Risk Calculation
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | Required |
-| `REDIS_URL` | Redis connection string | Required |
-| `ANTHROPIC_API_KEY` | Claude API key | Required |
-| `ML_MODEL_PATH` | Path to ML models | `../ml/models` |
-| `SECRET_KEY` | JWT secret key | Required |
-| `CORS_ORIGINS` | Allowed CORS origins | `http://localhost:3000` |
+```python
+risk_score = 100 - (prob_3m * 50 + prob_6m * 30 + prob_12m * 20)
 
-### Frontend Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `NEXT_PUBLIC_API_URL` | Backend API URL | `http://localhost:8000` |
-
-## Testing
-
-### Backend Tests
-```bash
-pytest backend/tests/ -v --cov=backend
+risk_level = {
+    0-33: "low",
+    34-66: "medium",
+    67-100: "high"
+}
 ```
 
-### Frontend Tests
+## 🔒 Security & Compliance
+
+### Rate Limiting
+
+- **POST /api/predict**: 100 requests/minute per IP
+- **POST /api/batch-score**: 10 requests/minute per IP
+- **GET endpoints**: 300 requests/minute per IP
+
+### Audit Logging
+
+All predictions, explanations, and alerts are logged to the `audit_logs` table with:
+- Action type (PREDICT, EXPLAIN, ALERT_SENT)
+- Student ID and Prediction ID
+- Model version
+- Timestamp
+- User identifier (if authenticated)
+
+### Fairness
+
+- Demographic features (gender, religion, caste, state) are **excluded** from all ML models
+- Post-hoc bias auditing with Fairlearn
+- Demographic parity monitoring
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**1. Database connection failed**
 ```bash
-cd frontend
-npm run test
+# Check if PostgreSQL is running
+docker-compose ps postgres
+
+# Check logs
+docker-compose logs postgres
+
+# Restart database
+docker-compose restart postgres
 ```
 
-## Development Workflow
+**2. ML models not found**
+```bash
+# Train models first
+python ml/pipeline/train.py
 
-1. **Feature Development**: Create feature branches from `main`
-2. **Code Quality**: Run linters and type checks before committing
-3. **Testing**: Write unit tests for new features
-4. **Documentation**: Update README and API docs
+# Or check if models directory is mounted correctly
+docker-compose exec backend ls -la /app/ml/models
+```
 
-## Deployment
+**3. Frontend can't connect to backend**
+```bash
+# Check if backend is running
+curl http://localhost:8000/api/health
 
-### Production Considerations
+# Check NEXT_PUBLIC_API_URL in frontend/.env.local
+cat frontend/.env.local
+```
 
-- Use environment-specific `.env` files
-- Set `DEBUG=False` in production
-- Use strong `SECRET_KEY` values
-- Configure proper CORS origins
-- Set up SSL/TLS certificates
-- Use managed PostgreSQL and Redis services
-- Implement proper logging and monitoring
-- Set up CI/CD pipelines
+**4. Rate limit exceeded**
+```bash
+# Clear Redis cache
+docker-compose exec redis redis-cli FLUSHALL
+```
 
-## License
+**5. Alembic migration failed**
+```bash
+# Check current migration version
+cd backend && alembic current
 
-Proprietary - TenzorX 2026 Hackathon Submission
+# Reset database (WARNING: deletes all data)
+docker-compose down -v
+docker-compose up -d
+```
 
-## Support
+### Logs
 
-For questions or issues, contact the development team.
+```bash
+# View all logs
+docker-compose logs -f
+
+# View specific service logs
+docker-compose logs -f backend
+docker-compose logs -f frontend
+docker-compose logs -f postgres
+docker-compose logs -f redis
+```
+
+## 📈 Performance
+
+- **Single Prediction**: < 5 seconds (95th percentile)
+- **Batch Prediction (500 students)**: < 60 seconds
+- **Health Check**: < 3 seconds
+- **Explanation Retrieval**: < 1 second
+- **Alert Query**: < 2 seconds
+
+## 🤝 Contributing
+
+This project was built for the TenzorX 2026 Poonawalla Fincorp National AI Hackathon.
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- **TenzorX 2026** - Poonawalla Fincorp National AI Hackathon
+- **XGBoost** - Gradient boosting framework
+- **SHAP** - Explainable AI library
+- **FastAPI** - Modern Python web framework
+- **Next.js** - React framework
+- **Anthropic** - Claude AI API
+
+## 📞 Support
+
+For issues and questions:
+- Check the [Troubleshooting](#troubleshooting) section
+- Review API documentation at http://localhost:8000/docs
+- Check Docker logs: `docker-compose logs -f`
+
+---
+
+**Built with ❤️ for better education loan decisions**

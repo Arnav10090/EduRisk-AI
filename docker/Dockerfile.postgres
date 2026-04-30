@@ -1,0 +1,15 @@
+# PostgreSQL 16 Dockerfile for EduRisk AI
+# This extends the official PostgreSQL 16 image with any custom configurations
+
+FROM postgres:16-alpine
+
+# Set environment variables for PostgreSQL
+ENV POSTGRES_USER=edurisk \
+    POSTGRES_PASSWORD=edurisk_password \
+    POSTGRES_DB=edurisk_db
+
+# Expose PostgreSQL port
+EXPOSE 5432
+
+# The base image already includes health check and proper initialization
+# No additional configuration needed for basic setup

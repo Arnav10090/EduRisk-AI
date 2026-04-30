@@ -1,8 +1,8 @@
-version: '3.8'
-
 services:
   postgres:
-    image: postgres:16-alpine
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.postgres
     container_name: edurisk-postgres
     environment:
       POSTGRES_USER: edurisk
@@ -48,11 +48,11 @@ services:
       SECRET_KEY: ${SECRET_KEY:-dev_secret_key_change_in_production}
       CORS_ORIGINS: http://localhost:3000,http://frontend:3000
       DEBUG: ${DEBUG:-True}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
       - "8000:8000"
     volumes:
       - ./ml/models:/app/ml/models:ro
-      - ./backend:/app/backend
     depends_on:
       postgres:
         condition: service_healthy
@@ -60,26 +60,20 @@ services:
         condition: service_healthy
     networks:
       - edurisk-network
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: ../docker/Dockerfile.frontend
+      context: .
+      dockerfile: docker/Dockerfile.frontend
     container_name: edurisk-frontend
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000
     ports:
       - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
     depends_on:
       - backend
     networks:
       - edurisk-network
-    command: npm run dev
 
 volumes:
   postgres_data:

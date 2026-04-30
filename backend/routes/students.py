@@ -53,6 +53,44 @@ class StudentListResponse(BaseModel):
     total_count: int
 
 
+class StudentDetailResponse(BaseModel):
+    """Response model for student detail with complete prediction data."""
+    student_id: str
+    name: str
+    course_type: str
+    institute_name: Optional[str]
+    institute_tier: int
+    cgpa: Optional[Decimal]
+    year_of_grad: int
+    created_at: str
+    
+    # Latest prediction fields (optional if no prediction exists)
+    prediction_id: Optional[str] = None
+    risk_score: Optional[int] = None
+    risk_level: Optional[str] = None
+    prob_placed_3m: Optional[Decimal] = None
+    prob_placed_6m: Optional[Decimal] = None
+    prob_placed_12m: Optional[Decimal] = None
+    salary_min: Optional[Decimal] = None
+    salary_max: Optional[Decimal] = None
+    salary_confidence: Optional[Decimal] = None
+    emi_affordability: Optional[Decimal] = None
+    shap_values: Optional[dict] = None
+    top_risk_drivers: Optional[List[dict]] = None
+    ai_summary: Optional[str] = None
+    next_best_actions: Optional[List[dict]] = None
+    alert_triggered: Optional[bool] = None
+    prediction_created_at: Optional[str] = None
+
+
+class PredictionHistoryEntry(BaseModel):
+    """Response model for prediction history entry."""
+    prediction_id: str
+    risk_score: int
+    risk_level: str
+    created_at: str
+
+
 @router.get("/students", response_model=StudentListResponse, status_code=status.HTTP_200_OK)
 async def list_students(
     search: Optional[str] = Query(default=None, description="Search by student name (case-insensitive)"),
@@ -207,4 +245,165 @@ async def list_students(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve students: {str(e)}"
+        )
+
+
+@router.get("/students/{student_id}", response_model=StudentDetailResponse, status_code=status.HTTP_200_OK)
+async def get_student_detail(
+    student_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Retrieve detailed information for a specific student with their latest prediction.
+    
+    This endpoint returns complete student data including all prediction fields
+    needed for the student detail page (SHAP values, AI summary, actions, etc.).
+    
+    Args:
+        student_id: UUID of the student
+        db: Database session (injected)
+        
+    Returns:
+        StudentDetailResponse with complete student and prediction data
+        
+    Raises:
+        HTTPException 404: Student not found
+        HTTPException 500: Internal server error
+    """
+    try:
+        logger.info(f"Fetching detail for student {student_id}")
+        
+        # Query student
+        student_query = select(Student).where(Student.id == student_id)
+        student_result = await db.execute(student_query)
+        student = student_result.scalar_one_or_none()
+        
+        if not student:
+            logger.warning(f"Student {student_id} not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Student with ID {student_id} not found"
+            )
+        
+        # Query latest prediction
+        prediction_query = (
+            select(Prediction)
+            .where(Prediction.student_id == student_id)
+            .order_by(desc(Prediction.created_at))
+            .limit(1)
+        )
+        prediction_result = await db.execute(prediction_query)
+        prediction = prediction_result.scalar_one_or_none()
+        
+        # Build response
+        response = StudentDetailResponse(
+            student_id=str(student.id),
+            name=student.name,
+            course_type=student.course_type,
+            institute_name=student.institute_name,
+            institute_tier=student.institute_tier,
+            cgpa=student.cgpa,
+            year_of_grad=student.year_of_grad,
+            created_at=student.created_at.isoformat()
+        )
+        
+        # Add prediction data if available
+        if prediction:
+            response.prediction_id = str(prediction.id)
+            response.risk_score = prediction.risk_score
+            response.risk_level = prediction.risk_level
+            response.prob_placed_3m = prediction.prob_placed_3m
+            response.prob_placed_6m = prediction.prob_placed_6m
+            response.prob_placed_12m = prediction.prob_placed_12m
+            response.salary_min = prediction.salary_min
+            response.salary_max = prediction.salary_max
+            response.salary_confidence = prediction.salary_confidence
+            response.emi_affordability = prediction.emi_affordability
+            response.shap_values = prediction.shap_values
+            response.top_risk_drivers = prediction.top_risk_drivers
+            response.ai_summary = prediction.ai_summary
+            response.next_best_actions = prediction.next_best_actions
+            response.alert_triggered = prediction.alert_triggered
+            response.prediction_created_at = prediction.created_at.isoformat()
+        
+        logger.info(f"Retrieved detail for student {student_id}")
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching student detail: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve student detail: {str(e)}"
+        )
+
+
+@router.get("/students/{student_id}/predictions", response_model=List[PredictionHistoryEntry], status_code=status.HTTP_200_OK)
+async def get_student_predictions(
+    student_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Retrieve prediction history for a specific student.
+    
+    This endpoint returns all predictions for a student, ordered by date descending,
+    for display in the audit trail timeline.
+    
+    Args:
+        student_id: UUID of the student
+        db: Database session (injected)
+        
+    Returns:
+        List of PredictionHistoryEntry objects
+        
+    Raises:
+        HTTPException 404: Student not found
+        HTTPException 500: Internal server error
+    """
+    try:
+        logger.info(f"Fetching prediction history for student {student_id}")
+        
+        # Verify student exists
+        student_query = select(Student).where(Student.id == student_id)
+        student_result = await db.execute(student_query)
+        student = student_result.scalar_one_or_none()
+        
+        if not student:
+            logger.warning(f"Student {student_id} not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Student with ID {student_id} not found"
+            )
+        
+        # Query all predictions for student
+        predictions_query = (
+            select(Prediction)
+            .where(Prediction.student_id == student_id)
+            .order_by(desc(Prediction.created_at))
+        )
+        predictions_result = await db.execute(predictions_query)
+        predictions = predictions_result.scalars().all()
+        
+        # Format response
+        history = [
+            PredictionHistoryEntry(
+                prediction_id=str(pred.id),
+                risk_score=pred.risk_score,
+                risk_level=pred.risk_level,
+                created_at=pred.created_at.isoformat()
+            )
+            for pred in predictions
+        ]
+        
+        logger.info(f"Retrieved {len(history)} predictions for student {student_id}")
+        return history
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching prediction history: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve prediction history: {str(e)}"
         )

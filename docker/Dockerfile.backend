@@ -13,6 +13,14 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy wait-for-db script
+COPY docker/wait-for-db.py /app/wait-for-db.py
+RUN chmod +x /app/wait-for-db.py
+
+# Copy startup script
+COPY docker/start-backend.sh /app/start-backend.sh
+RUN chmod +x /app/start-backend.sh
+
 # Copy application code
 COPY backend ./backend
 COPY ml ./ml
@@ -23,9 +31,9 @@ RUN mkdir -p /app/ml/models
 # Expose port
 EXPOSE 8000
 
-# Health check
+# Health check using httpx (already in requirements.txt)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD python -c "import requests; requests.get('http://localhost:8000/api/health')"
+  CMD python -c "import httpx; httpx.get('http://localhost:8000/api/health', timeout=5)"
 
 # Run the application
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/app/start-backend.sh"]
