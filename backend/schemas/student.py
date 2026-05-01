@@ -77,14 +77,12 @@ class StudentInput(BaseModel):
     cgpa: Optional[Decimal] = Field(
         None,
         ge=0,
-        decimal_places=2,
         description="Cumulative Grade Point Average"
     )
     
     cgpa_scale: Decimal = Field(
         default=Decimal("10.0"),
         gt=0,
-        decimal_places=2,
         description="CGPA scale (typically 4.0 or 10.0)"
     )
     
@@ -131,14 +129,12 @@ class StudentInput(BaseModel):
     loan_amount: Optional[Decimal] = Field(
         None,
         ge=0,
-        decimal_places=2,
         description="Total loan amount in INR (must be non-negative)"
     )
     
     loan_emi: Optional[Decimal] = Field(
         None,
         ge=0,
-        decimal_places=2,
         description="Monthly EMI amount in INR (must be non-negative)"
     )
     

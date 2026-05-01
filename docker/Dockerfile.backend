@@ -17,6 +17,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY docker/wait-for-db.py /app/wait-for-db.py
 RUN chmod +x /app/wait-for-db.py
 
+# Copy database initialization script
+COPY docker/init-db.py /app/init-db.py
+RUN chmod +x /app/init-db.py
+
 # Copy startup script
 COPY docker/start-backend.sh /app/start-backend.sh
 RUN chmod +x /app/start-backend.sh

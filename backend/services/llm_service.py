@@ -1,44 +1,70 @@
 """
 LLM integration service for generating AI-powered risk summaries.
 
-This module provides the LLMService class that integrates with Anthropic's
-Claude API to generate natural language explanations of student placement
-risk assessments.
+This module provides the LLMService class that integrates with Groq API
+to generate natural language explanations of student placement risk assessments.
+Supports both Groq and Anthropic Claude APIs.
 """
 
 import asyncio
 from typing import Dict, List, Optional
-import anthropic
-from anthropic import AsyncAnthropic
+import os
+
+try:
+    import anthropic
+    from anthropic import AsyncAnthropic
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    ANTHROPIC_AVAILABLE = False
+
+try:
+    from groq import AsyncGroq
+    GROQ_AVAILABLE = True
+except ImportError:
+    GROQ_AVAILABLE = False
 
 
 class LLMService:
     """
-    Service for generating AI-powered risk summaries using Claude API.
+    Service for generating AI-powered risk summaries using Groq or Claude API.
     
     This service generates concise, plain-English explanations of student
-    placement risk assessments for loan officers. It uses Claude Sonnet 4
-    to create 2-sentence summaries that highlight the risk level and key
-    contributing factors.
+    placement risk assessments for loan officers. It supports both Groq
+    (default, free tier available) and Anthropic Claude APIs.
     
     Requirements:
-        - 6.1: Generate natural language risk summary using Claude API
-        - 6.2: Use claude-sonnet-4-20250514 model
+        - 6.1: Generate natural language risk summary using LLM API
+        - 6.2: Use high-quality language model
         - 6.3: Include student data and risk factors in prompt
         - 6.4: Limit summary to 2 sentences maximum
         - 6.5: Start summary with risk level and primary driver
         - 6.7: Provide fallback on API failures
     """
     
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, provider: str = "groq"):
         """
-        Initialize LLM service with Anthropic API credentials.
+        Initialize LLM service with API credentials.
         
         Args:
-            api_key: Anthropic API key for authentication
+            api_key: API key for authentication (Groq or Anthropic)
+            provider: LLM provider - "groq" (default) or "anthropic"
         """
-        self.client = AsyncAnthropic(api_key=api_key)
-        self.model = "claude-sonnet-4-20250514"
+        self.provider = provider.lower()
+        self.api_key = api_key
+        
+        if self.provider == "groq":
+            if not GROQ_AVAILABLE:
+                raise ImportError("groq package not installed. Run: pip install groq")
+            self.client = AsyncGroq(api_key=api_key)
+            self.model = "llama-3.3-70b-versatile"  # Fast and high quality
+        elif self.provider == "anthropic":
+            if not ANTHROPIC_AVAILABLE:
+                raise ImportError("anthropic package not installed. Run: pip install anthropic")
+            self.client = AsyncAnthropic(api_key=api_key)
+            self.model = "claude-sonnet-4-20250514"
+        else:
+            raise ValueError(f"Unsupported provider: {provider}. Use 'groq' or 'anthropic'")
+        
         self.max_tokens = 200
         self.temperature = 0.3
         self.timeout = 5.0  # seconds
@@ -117,24 +143,44 @@ class LLMService:
             # Build the prompt with student and prediction data
             prompt = self._build_prompt(student_data, prediction, top_risk_drivers)
             
-            # Call Claude API with timeout
-            response = await asyncio.wait_for(
-                self.client.messages.create(
-                    model=self.model,
-                    max_tokens=self.max_tokens,
-                    temperature=self.temperature,
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ]
-                ),
-                timeout=self.timeout
-            )
-            
-            # Extract text from response
-            summary = response.content[0].text.strip()
+            # Call LLM API based on provider
+            if self.provider == "groq":
+                response = await asyncio.wait_for(
+                    self.client.chat.completions.create(
+                        model=self.model,
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "You are a credit risk analyst at an Indian NBFC. Provide concise, professional risk assessments."
+                            },
+                            {
+                                "role": "user",
+                                "content": prompt
+                            }
+                        ],
+                        max_tokens=self.max_tokens,
+                        temperature=self.temperature
+                    ),
+                    timeout=self.timeout
+                )
+                summary = response.choices[0].message.content.strip()
+                
+            elif self.provider == "anthropic":
+                response = await asyncio.wait_for(
+                    self.client.messages.create(
+                        model=self.model,
+                        max_tokens=self.max_tokens,
+                        temperature=self.temperature,
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": prompt
+                            }
+                        ]
+                    ),
+                    timeout=self.timeout
+                )
+                summary = response.content[0].text.strip()
             
             return summary
             
@@ -142,12 +188,8 @@ class LLMService:
             # Timeout occurred
             return self.fallback_message
             
-        except anthropic.APIError as e:
-            # Anthropic API error (rate limit, auth, etc.)
-            return self.fallback_message
-            
         except Exception as e:
-            # Any other unexpected error
+            # Any API error (rate limit, auth, network, etc.)
             return self.fallback_message
     
     def _build_prompt(
@@ -183,7 +225,7 @@ class LLMService:
         prob_12m_pct = int(prediction["prob_placed_12m"] * 100)
         
         # Build the prompt
-        prompt = f"""You are a credit risk analyst at an Indian NBFC. Given this student's placement risk assessment, write a 2-sentence plain-English summary for a loan officer.
+        prompt = f"""Given this student's placement risk assessment, write a 2-sentence plain-English summary for a loan officer.
 
 Student: {student_data["course_type"]} from Tier-{student_data["institute_tier"]} institute, CGPA {student_data["cgpa"]}, {student_data["internship_count"]} internships
 Risk score: {prediction["risk_score"]}/100 ({prediction["risk_level"]} risk)

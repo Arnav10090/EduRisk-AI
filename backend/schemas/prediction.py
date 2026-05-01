@@ -154,7 +154,6 @@ class PredictionResponse(BaseModel):
         ...,
         ge=0,
         le=1,
-        decimal_places=4,
         description="Probability of placement within 3 months (0.0000 to 1.0000)"
     )
     
@@ -162,7 +161,6 @@ class PredictionResponse(BaseModel):
         ...,
         ge=0,
         le=1,
-        decimal_places=4,
         description="Probability of placement within 6 months (0.0000 to 1.0000)"
     )
     
@@ -170,7 +168,6 @@ class PredictionResponse(BaseModel):
         ...,
         ge=0,
         le=1,
-        decimal_places=4,
         description="Probability of placement within 12 months (0.0000 to 1.0000)"
     )
     
@@ -197,21 +194,18 @@ class PredictionResponse(BaseModel):
     salary_min: Optional[Decimal] = Field(
         None,
         ge=0,
-        decimal_places=2,
         description="Minimum predicted salary in LPA (Lakhs Per Annum)"
     )
     
     salary_max: Optional[Decimal] = Field(
         None,
         ge=0,
-        decimal_places=2,
         description="Maximum predicted salary in LPA (Lakhs Per Annum)"
     )
     
     salary_confidence: Optional[Decimal] = Field(
         None,
         ge=0,
-        decimal_places=2,
         description="Salary prediction confidence as percentage"
     )
     
@@ -219,7 +213,6 @@ class PredictionResponse(BaseModel):
     emi_affordability: Optional[Decimal] = Field(
         None,
         ge=0,
-        decimal_places=2,
         description="Ratio of monthly EMI to predicted monthly salary"
     )
     

@@ -9,14 +9,14 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
-# Add parent directory to path to import backend modules
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, parent_dir)
+# Add parent directories to path
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+app_dir = os.path.dirname(backend_dir)
+sys.path.insert(0, app_dir)
+sys.path.insert(0, backend_dir)
 
-# Import Base directly from session module
+# Import Base and models
 from db.session import Base
-
-# Import all models directly for autogenerate support
 from models.student import Student
 from models.prediction import Prediction
 from models.audit_log import AuditLog

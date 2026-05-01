@@ -49,7 +49,13 @@ def get_prediction_service() -> PredictionService:
         feature_engineer = FeatureEngineer()
         placement_predictor = PlacementPredictor(model_dir)
         salary_estimator = SalaryEstimator(model_dir / "salary_model.pkl")
-        llm_service = LLMService(config.anthropic_api_key)
+        
+        # Initialize LLM service with configured provider
+        llm_api_key = config.llm_api_key or config.anthropic_api_key or ""
+        llm_service = LLMService(
+            api_key=llm_api_key,
+            provider=config.llm_provider
+        )
         
         # Create prediction service
         _prediction_service = PredictionService(

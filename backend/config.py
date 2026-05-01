@@ -39,9 +39,18 @@ class Configuration(BaseSettings):
         default=None,
         description="Redis connection URL for caching"
     )
+    llm_api_key: Optional[str] = Field(
+        default=None,
+        description="LLM API key (Groq or Anthropic)"
+    )
+    llm_provider: str = Field(
+        default="groq",
+        description="LLM provider: 'groq' or 'anthropic'"
+    )
+    # Backward compatibility
     anthropic_api_key: Optional[str] = Field(
         default=None,
-        description="Anthropic API key for LLM integration"
+        description="Anthropic API key (deprecated, use llm_api_key)"
     )
     secret_key: Optional[str] = Field(
         default=None,
@@ -93,6 +102,11 @@ class Configuration(BaseSettings):
         """Ensure cors_origins is always a list after initialization."""
         if isinstance(self.cors_origins, str):
             self.cors_origins = [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        
+        # Backward compatibility: use anthropic_api_key if llm_api_key not set
+        if not self.llm_api_key and self.anthropic_api_key:
+            self.llm_api_key = self.anthropic_api_key
+            self.llm_provider = "anthropic"
 
 
 def parse_config(file_path: str) -> Configuration:

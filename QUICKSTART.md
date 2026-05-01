@@ -1,254 +1,237 @@
 # EduRisk AI - Quick Start Guide
 
-Get up and running with EduRisk AI in 5 minutes.
-
 ## Prerequisites
 
 - Docker Desktop installed and running
-- Git installed
-- Text editor (VS Code recommended)
+- Git (to clone the repository)
+- Groq API key (free at https://console.groq.com)
 
-## Setup (5 minutes)
+## Step 1: Environment Setup
 
-### 1. Clone and Configure (2 minutes)
-
-```bash
-# Clone repository
-git clone <repository-url>
-cd edurisk-ai
-
-# Configure backend
-cp backend/.env.example backend/.env
-# Edit backend/.env and add your ANTHROPIC_API_KEY
-
-# Configure frontend
-cp frontend/.env.example frontend/.env
-```
-
-### 2. Start Services (2 minutes)
+Create a `.env` file in the project root:
 
 ```bash
-# Start all services with Docker
-docker-compose up -d
+# LLM Configuration
+LLM_API_KEY=your_groq_api_key_here
+LLM_PROVIDER=groq
 
-# Wait for services to be healthy (check with)
-docker-compose ps
+# Database (defaults work for Docker)
+DATABASE_URL=postgresql+asyncpg://edurisk:edurisk_password@postgres:5432/edurisk_db
+
+# Redis (defaults work for Docker)
+REDIS_URL=redis://redis:6379/0
+
+# Security
+SECRET_KEY=your_secret_key_here_change_in_production
+
+# Optional
+DEBUG=True
+LOG_LEVEL=INFO
 ```
 
-### 3. Verify Installation (1 minute)
+## Step 2: Start All Services
 
 ```bash
-# Check backend health
-curl http://localhost:8000/api/health
-
-# Open frontend in browser
-open http://localhost:3000
-
-# View API documentation
-open http://localhost:8000/docs
+docker-compose up -d --build
 ```
 
-## What's Running?
+This will:
+- Build and start PostgreSQL database
+- Build and start Redis cache
+- Build and start FastAPI backend
+- Build and start Next.js frontend
+- Create all database tables automatically
 
-After `docker-compose up -d`, you have:
+## Step 3: Verify Services
 
-- **PostgreSQL 16** on port 5432 - Database
-- **Redis 7** on port 6379 - Caching and rate limiting
-- **FastAPI Backend** on port 8000 - API server
-- **Next.js Frontend** on port 3000 - Web interface
-
-## Next Steps
-
-### 1. Train ML Models
-
-Before making predictions, train the models:
+Check that all containers are running:
 
 ```bash
-# Enter backend container
-docker-compose exec backend bash
-
-# Generate synthetic training data
-python ml/data/generate_synthetic.py
-
-# Train placement models
-python ml/pipeline/train.py
-
-# Train salary model
-python ml/pipeline/salary_model.py
-
-# Exit container
-exit
+docker ps
 ```
 
-### 2. Explore the API
+You should see 4 containers:
+- `edurisk-postgres` (database)
+- `edurisk-redis` (cache)
+- `edurisk-backend` (API)
+- `edurisk-frontend` (web UI)
 
-Visit http://localhost:8000/docs to see interactive API documentation.
+## Step 4: Access the Application
 
-Try the health check endpoint:
+### Frontend (Web UI)
+- **URL**: http://127.0.0.1:3000
+- **Dashboard**: View portfolio risk overview
+- **Add Student**: http://127.0.0.1:3000/student/new
+
+### Backend (API)
+- **API Base**: http://127.0.0.1:8000
+- **API Docs**: http://127.0.0.1:8000/docs
+- **Health Check**: http://127.0.0.1:8000/api/health
+
+## Step 5: Add Your First Student
+
+### Option A: Using the Web UI
+
+1. Go to http://127.0.0.1:3000/student/new
+2. Fill in the student details:
+   - Name: John Doe
+   - Course Type: Engineering
+   - Institute Tier: 1 (Tier 1 = Top institutes)
+   - CGPA: 8.5
+   - Year of Graduation: 2024
+3. Click "Submit"
+4. View the generated risk assessment
+
+### Option B: Using the API
+
 ```bash
-curl http://localhost:8000/api/health
+curl -X POST http://127.0.0.1:8000/api/students \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John Doe",
+    "course_type": "Engineering",
+    "institute_tier": 1,
+    "cgpa": 8.5,
+    "year_of_grad": 2024,
+    "internship_count": 2,
+    "internship_months": 6,
+    "certifications": 3
+  }'
 ```
 
-### 3. Start Development
+## Step 6: View the Dashboard
 
-The project is now ready for feature development. See `tasks.md` for the implementation plan.
+Go to http://127.0.0.1:3000 to see:
+- **Risk Score Cards**: Aggregate statistics (high/medium/low risk)
+- **Portfolio Heatmap**: Visual representation of risk distribution
+- **Student Table**: Sortable list of all students with risk scores
+- **Alert Banner**: High-risk student notifications
 
 ## Common Commands
 
+### View Logs
 ```bash
-# View logs
-docker-compose logs -f backend
-docker-compose logs -f frontend
+# Backend logs
+docker logs edurisk-backend
 
-# Restart a service
+# Frontend logs
+docker logs edurisk-frontend
+
+# Database logs
+docker logs edurisk-postgres
+
+# Follow logs in real-time
+docker logs -f edurisk-backend
+```
+
+### Restart Services
+```bash
+# Restart all services
+docker-compose restart
+
+# Restart specific service
 docker-compose restart backend
+```
 
+### Stop Services
+```bash
 # Stop all services
 docker-compose down
 
-# Stop and remove volumes (clean slate)
+# Stop and remove volumes (WARNING: deletes all data)
 docker-compose down -v
+```
 
-# Run backend tests
-docker-compose exec backend pytest
+### Rebuild After Code Changes
+```bash
+# Rebuild and restart all services
+docker-compose up -d --build
 
-# Access database
-docker-compose exec postgres psql -U edurisk -d edurisk_db
-
-# Access Redis CLI
-docker-compose exec redis redis-cli
+# Rebuild specific service
+docker-compose up -d --build backend
 ```
 
 ## Troubleshooting
 
-### Services won't start
-```bash
-# Check if ports are already in use
-lsof -i :3000  # Frontend
-lsof -i :8000  # Backend
-lsof -i :5432  # PostgreSQL
-lsof -i :6379  # Redis
+### Frontend shows "Loading dashboard..."
 
-# Stop conflicting services or change ports in docker-compose.yml
-```
+1. Check if backend is running:
+   ```bash
+   curl http://127.0.0.1:8000/api/health
+   ```
 
-### Backend errors
-```bash
-# Check logs
-docker-compose logs backend
+2. Check backend logs:
+   ```bash
+   docker logs edurisk-backend --tail 50
+   ```
 
-# Restart backend
-docker-compose restart backend
-```
+3. Verify database tables exist:
+   ```bash
+   docker exec edurisk-backend python /app/init-db.py
+   ```
 
-### Frontend errors
-```bash
-# Check logs
-docker-compose logs frontend
+### Backend shows database errors
 
-# Rebuild frontend
-docker-compose up -d --build frontend
-```
+1. Check if PostgreSQL is running:
+   ```bash
+   docker ps | grep postgres
+   ```
 
-### Database connection issues
-```bash
-# Verify PostgreSQL is running
-docker-compose ps postgres
+2. Verify database connection:
+   ```bash
+   docker exec edurisk-postgres psql -U edurisk -d edurisk_db -c "\dt"
+   ```
 
-# Check database logs
-docker-compose logs postgres
+3. Recreate database tables:
+   ```bash
+   docker exec edurisk-backend python /app/init-db.py
+   ```
 
-# Restart database
-docker-compose restart postgres
-```
+### Port already in use
 
-## Development Workflow
+If you see "port already allocated" errors:
 
-### Making Code Changes
+1. Check what's using the port:
+   ```bash
+   # Windows
+   netstat -ano | findstr :8000
+   netstat -ano | findstr :3000
+   ```
 
-**Backend changes:**
-- Edit files in `backend/` or `ml/`
-- Changes auto-reload (FastAPI --reload mode)
-- No restart needed
+2. Stop the conflicting service or change ports in `docker-compose.yml`
 
-**Frontend changes:**
-- Edit files in `frontend/`
-- Changes auto-reload (Next.js dev mode)
-- No restart needed
+### API returns 500 errors
 
-### Running Tests
+1. Check if you have a valid Groq API key in `.env`
+2. Verify ML models are available:
+   ```bash
+   docker exec edurisk-backend ls -la /app/ml/models
+   ```
 
-```bash
-# Backend tests
-docker-compose exec backend pytest -v
+## Next Steps
 
-# Frontend tests
-docker-compose exec frontend npm test
-```
+1. **Train ML Models**: Follow `ml/README.md` to train placement prediction models
+2. **Import Sample Data**: Use the bulk import API to add multiple students
+3. **Configure Alerts**: Set up email/SMS notifications for high-risk students
+4. **Customize Risk Thresholds**: Adjust risk scoring in `backend/services/risk_calculator.py`
 
-### Database Migrations
+## Support
 
-```bash
-# Create migration
-docker-compose exec backend alembic revision --autogenerate -m "Description"
+- **Documentation**: See `API_DOCUMENTATION.md` for full API reference
+- **Docker Issues**: See `DOCKER_FINAL_FIX_SUMMARY.md`
+- **Environment Variables**: See `ENVIRONMENT_VARIABLES.md`
 
-# Apply migrations
-docker-compose exec backend alembic upgrade head
+## Important Notes
 
-# Rollback
-docker-compose exec backend alembic downgrade -1
-```
+### Windows Users
+- Always use `127.0.0.1` instead of `localhost` when accessing services
+- This is a Windows Docker Desktop networking requirement
 
-## Project Structure
-
-```
-edurisk-ai/
-├── ml/                    # ML Pipeline (Python)
-├── backend/               # API Backend (FastAPI)
-├── frontend/              # Web UI (Next.js)
-├── docker/                # Docker configs
-├── docker-compose.yml     # Service orchestration
-└── requirements.txt       # Python dependencies
-```
-
-## Key URLs
-
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
-- **API Redoc**: http://localhost:8000/redoc
-
-## Getting Help
-
-1. Check `README.md` for detailed documentation
-2. Check `SETUP.md` for detailed setup instructions
-3. Check `PROJECT_STATUS.md` for current implementation status
-4. Review error logs: `docker-compose logs <service>`
-
-## Clean Slate
-
-To start fresh:
-
-```bash
-# Stop and remove everything
-docker-compose down -v
-
-# Remove Python cache
-find . -type d -name __pycache__ -exec rm -rf {} +
-find . -type f -name "*.pyc" -delete
-
-# Remove frontend build
-rm -rf frontend/.next frontend/node_modules
-
-# Start again
-docker-compose up -d
-```
-
----
-
-**Ready to build!** 🚀
-
-For detailed documentation, see:
-- `README.md` - Full project documentation
-- `SETUP.md` - Detailed setup guide
-- `tasks.md` - Implementation task list
+### Production Deployment
+- Change `SECRET_KEY` to a strong random value
+- Set `DEBUG=False`
+- Use a production-grade database (not Docker volume)
+- Enable HTTPS/TLS
+- Set up proper authentication
+- Configure rate limiting
+- See `DEPLOYMENT_GUIDE.md` for details

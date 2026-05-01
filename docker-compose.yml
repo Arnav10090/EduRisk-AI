@@ -43,10 +43,11 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://edurisk:edurisk_password@postgres:5432/edurisk_db
       REDIS_URL: redis://redis:6379/0
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-groq}
       ML_MODEL_PATH: /app/ml/models
       SECRET_KEY: ${SECRET_KEY:-dev_secret_key_change_in_production}
-      CORS_ORIGINS: http://localhost:3000,http://frontend:3000
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://frontend:3000
       DEBUG: ${DEBUG:-True}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
@@ -67,7 +68,7 @@ services:
       dockerfile: docker/Dockerfile.frontend
     container_name: edurisk-frontend
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
     ports:
       - "3000:3000"
     depends_on:

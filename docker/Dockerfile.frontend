@@ -36,9 +36,15 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
 # Copy built application
+# Note: public directory may be empty for new projects
+RUN mkdir -p /app/public
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Copy startup script
+COPY docker/start-frontend.sh ./start-frontend.sh
+RUN chmod +x ./start-frontend.sh
 
 USER nextjs
 
@@ -52,5 +58,5 @@ ENV HOSTNAME="0.0.0.0"
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Run the application
-CMD ["node", "server.js"]
+# Run the application with startup script
+CMD ["./start-frontend.sh"]
