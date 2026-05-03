@@ -57,7 +57,7 @@ class Configuration(BaseSettings):
         description="Secret key for JWT token signing"
     )
     cors_origins: str | List[str] = Field(
-        default="http://localhost:3000",
+        default="http://localhost:3000,http://127.0.0.1:3000",
         description="Allowed CORS origins (comma-separated string or list)"
     )
     
@@ -87,16 +87,57 @@ class Configuration(BaseSettings):
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, v) -> List[str]:
-        """Parse cors_origins from string or list."""
+        """
+        Parse cors_origins from string or list.
+        
+        Requirements: 22.1, 22.2, 22.3, 22.4
+        - Parse comma-separated list of URLs
+        - Validate each origin is a full URL
+        - Reject wildcard (*) in production
+        - Log warning if wildcard detected
+        """
+        import os
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
         if v is None or v == "":
-            return ["http://localhost:3000"]
+            return ["http://localhost:3000", "http://127.0.0.1:3000"]
+        
+        # Parse to list
         if isinstance(v, str):
             # Split comma-separated string into list
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        if isinstance(v, list):
-            return v
-        # If it's some other type, try to convert to list
-        return list(v)
+            origins = [origin.strip() for origin in v.split(",") if origin.strip()]
+        elif isinstance(v, list):
+            origins = v
+        else:
+            # If it's some other type, try to convert to list
+            origins = list(v)
+        
+        # Check for wildcard
+        if "*" in origins:
+            logger.warning(
+                "⚠️ SECURITY WARNING: CORS_ORIGINS contains wildcard (*). "
+                "This allows requests from ANY origin and should NEVER be used in production!"
+            )
+            
+            # Reject wildcard in production
+            debug_mode = os.getenv("DEBUG", "False").lower() == "true"
+            if not debug_mode:
+                raise ValueError(
+                    "Wildcard (*) CORS origins are not allowed in production. "
+                    "Set DEBUG=True for development or specify explicit origins."
+                )
+        
+        # Validate each origin is a full URL (not just a domain)
+        for origin in origins:
+            if origin != "*" and not origin.startswith(("http://", "https://")):
+                raise ValueError(
+                    f"Invalid CORS origin '{origin}'. "
+                    f"Origins must be full URLs starting with http:// or https://"
+                )
+        
+        return origins
     
     def model_post_init(self, __context) -> None:
         """Ensure cors_origins is always a list after initialization."""

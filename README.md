@@ -55,7 +55,7 @@ EduRisk AI predicts student placement outcomes and generates actionable risk ass
 | Database | PostgreSQL | 16 |
 | ORM | SQLAlchemy | 2.0.30 |
 | Cache | Redis | 7 |
-| LLM | Anthropic Claude Sonnet 4 | Latest |
+| LLM | Groq API (Llama 3.1) / Anthropic Claude | Latest |
 | Frontend | Next.js | 14 |
 | UI Components | shadcn/ui + Tailwind CSS | Latest |
 | Containerization | Docker + Docker Compose | Latest |
@@ -65,7 +65,7 @@ EduRisk AI predicts student placement outcomes and generates actionable risk ass
 ### Prerequisites
 
 - **Docker** (20.10+) and **Docker Compose** (2.0+)
-- **Anthropic API Key** (for AI summaries)
+- **LLM API Key** (optional - for AI summaries, system works without it)
 - **8GB RAM** minimum
 - **10GB disk space** for Docker images and data
 
@@ -84,11 +84,30 @@ EduRisk AI predicts student placement outcomes and generates actionable risk ass
    
    Edit `.env` and configure:
    ```env
-   ANTHROPIC_API_KEY=your_anthropic_api_key_here
-   SECRET_KEY=your_secret_key_here
-   DATABASE_URL=postgresql+asyncpg://edurisk:edurisk_password@postgres:5432/edurisk_db
-   REDIS_URL=redis://redis:6379/0
+   # LLM API Configuration (Optional - system works without it)
+   # Option 1: Groq API (Recommended - Free tier available, fast inference)
+   LLM_API_KEY=your_groq_api_key_here
+   LLM_PROVIDER=groq
+   
+   # Option 2: Anthropic Claude API (Alternative, higher quality)
+   # LLM_API_KEY=sk-ant-api03-your-key-here
+   # LLM_PROVIDER=anthropic
+   
+   # Security (Required)
+   SECRET_KEY=your_secret_key_here_change_in_production
+   API_KEY=your_api_key_here_change_in_production
+   
+   # Application Settings
+   DEBUG=False  # Set to True only for local development
+   LOG_LEVEL=INFO
+   
+   # Database Configuration (optional - defaults are set in docker-compose.yml)
+   # POSTGRES_USER=edurisk
+   # POSTGRES_PASSWORD=edurisk_password
+   # POSTGRES_DB=edurisk_db
    ```
+   
+   **Note**: The LLM integration is optional. If `LLM_API_KEY` is not configured, the system will gracefully degrade and provide predictions without AI-generated summaries.
 
 3. **Validate setup**
    ```bash
@@ -226,13 +245,27 @@ curl http://localhost:8000/api/health
 |----------|-------------|---------|----------|
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql+asyncpg://...` | Yes |
 | `REDIS_URL` | Redis connection string | `redis://redis:6379/0` | Yes |
-| `ANTHROPIC_API_KEY` | Anthropic API key for Claude | - | Yes |
+| `LLM_API_KEY` | API key for LLM provider (Groq or Anthropic) | - | No* |
+| `LLM_PROVIDER` | LLM provider to use: `groq` or `anthropic` | `groq` | No* |
+| `API_KEY` | API key for authenticating API requests via X-API-Key header | - | Yes |
 | `ML_MODEL_PATH` | Path to ML models directory | `/app/ml/models` | Yes |
-| `SECRET_KEY` | Secret key for JWT tokens | - | Yes |
+| `SECRET_KEY` | Secret key for JWT tokens and encryption | - | Yes |
 | `CORS_ORIGINS` | Allowed CORS origins | `http://localhost:3000` | No |
-| `DEBUG` | Enable debug mode | `True` | No |
-| `LOG_LEVEL` | Logging level | `INFO` | No |
-| `LOG_JSON_FORMAT` | Use JSON logging | `True` | No |
+| `DEBUG` | Enable debug mode with detailed error traces | `False` | No |
+| `LOG_LEVEL` | Logging level (DEBUG, INFO, WARNING, ERROR) | `INFO` | No |
+| `LOG_JSON_FORMAT` | Use JSON logging format | `True` | No |
+
+**\*LLM Integration Note**: The `LLM_API_KEY` and `LLM_PROVIDER` are optional. If not configured, the system will gracefully degrade and provide predictions without AI-generated summaries. All core functionality (predictions, risk scoring, SHAP explanations) works without LLM integration.
+
+**DEBUG Usage**: 
+- Set `DEBUG=False` for production deployments to hide stack traces and sensitive error details
+- Set `DEBUG=True` only for local development to see detailed error information
+- Default is `False` for security
+
+**API_KEY Usage**:
+- Required for all API endpoints except `/api/health`, `/docs`, `/redoc`, `/openapi.json`, and `/`
+- Include in requests via `X-API-Key` header
+- Example: `curl -H "X-API-Key: your_api_key_here" http://localhost:8000/api/predict`
 
 #### Frontend Configuration
 
@@ -498,6 +531,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - **SHAP** - Explainable AI library
 - **FastAPI** - Modern Python web framework
 - **Next.js** - React framework
+- **Groq** - Fast LLM inference API
 - **Anthropic** - Claude AI API
 
 ## 📞 Support

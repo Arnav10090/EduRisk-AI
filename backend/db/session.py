@@ -96,3 +96,43 @@ async def close_db() -> None:
     Should be called on application shutdown.
     """
     await engine.dispose()
+
+
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Create an independent async database session.
+    
+    This context manager creates a completely independent database session
+    that is not shared with other concurrent operations. Use this for batch
+    processing where each item needs its own session to prevent race conditions
+    and session corruption.
+    
+    The session is automatically committed on success, rolled back on error,
+    and closed after use.
+    
+    Yields:
+        AsyncSession: Independent database session
+        
+    Example:
+        async with get_async_session() as db:
+            # Process item with independent session
+            result = await process_item(db)
+            # Session is automatically committed and closed
+            
+    Requirements:
+        - 9.1: Create separate database session for each student in batch
+        - 9.2: Do not share session across concurrent predictions
+        - 9.6: Close each session after processing
+    """
+    async with async_session_maker() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()

@@ -13,6 +13,7 @@ Complete guide for deploying EduRisk AI in various environments.
 7. [Monitoring & Logging](#monitoring--logging)
 8. [Backup & Recovery](#backup--recovery)
 9. [Troubleshooting](#troubleshooting)
+10. [Vercel Deployment](#vercel-deployment)
 
 ---
 
@@ -810,6 +811,167 @@ py-spy record -o profile.svg --pid $(pgrep -f uvicorn)
 - [ ] CORS configuration
 - [ ] Secrets management
 - [ ] Network segmentation
+
+---
+
+## Vercel Deployment
+
+### Overview
+
+Deploy the EduRisk AI frontend to Vercel for a live demo accessible to hackathon judges.
+
+**Estimated Time**: 5 minutes
+
+### Prerequisites
+
+- GitHub account with EduRisk AI repository
+- Vercel account (free tier is sufficient)
+- Backend API deployed and accessible (e.g., on Railway, Render, or AWS)
+
+### Step-by-Step Deployment
+
+#### 1. Connect GitHub Repository to Vercel
+
+1. Go to [vercel.com](https://vercel.com) and sign in
+2. Click "Add New Project"
+3. Select "Import Git Repository"
+4. Choose your EduRisk AI repository
+5. Vercel will auto-detect Next.js configuration
+
+#### 2. Configure Environment Variables
+
+In the Vercel project settings, add the following environment variables:
+
+**Required Variables**:
+```bash
+NEXT_PUBLIC_API_URL=https://your-backend-api.com
+NEXT_PUBLIC_API_KEY=your_api_key_here
+```
+
+**How to add**:
+1. Go to Project Settings → Environment Variables
+2. Add each variable with its value
+3. Select "Production", "Preview", and "Development" environments
+
+#### 3. Configure Build Settings
+
+Vercel should auto-detect these settings, but verify:
+
+- **Framework Preset**: Next.js
+- **Root Directory**: `frontend`
+- **Build Command**: `npm run build`
+- **Output Directory**: `.next`
+- **Install Command**: `npm install`
+
+#### 4. Deploy
+
+1. Click "Deploy"
+2. Wait 2-3 minutes for build to complete
+3. Vercel will provide a live URL: `https://your-project.vercel.app`
+
+#### 5. Verify Deployment
+
+1. Visit the deployed URL
+2. Test login functionality
+3. Create a test prediction
+4. Verify API connectivity
+
+### Environment Variables Reference
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `NEXT_PUBLIC_API_URL` | Backend API base URL | `https://api.edurisk.com` |
+| `NEXT_PUBLIC_API_KEY` | API key for backend authentication | `your_secret_key` |
+
+**Important**: 
+- Variables prefixed with `NEXT_PUBLIC_` are exposed to the browser
+- Never commit real API keys to version control
+- Use different API keys for production vs development
+
+### Troubleshooting
+
+#### Issue: Build fails with "Module not found"
+
+**Solution**:
+```bash
+# Ensure all dependencies are in package.json
+cd frontend
+npm install
+npm run build  # Test locally first
+```
+
+#### Issue: API requests fail with CORS error
+
+**Solution**:
+- Add your Vercel domain to `CORS_ORIGINS` in backend `.env`:
+  ```bash
+  CORS_ORIGINS=https://your-project.vercel.app,http://localhost:3000
+  ```
+- Redeploy backend with updated CORS configuration
+
+#### Issue: Environment variables not working
+
+**Solution**:
+- Verify variables are prefixed with `NEXT_PUBLIC_`
+- Redeploy after adding/changing environment variables
+- Check browser console for actual API URL being used
+
+#### Issue: 404 on page refresh
+
+**Solution**:
+- Vercel automatically handles Next.js routing
+- If issue persists, check `next.config.js` for custom routing
+
+### Custom Domain (Optional)
+
+1. Go to Project Settings → Domains
+2. Add your custom domain
+3. Update DNS records as instructed by Vercel
+4. SSL certificate is automatically provisioned
+
+### Continuous Deployment
+
+Vercel automatically deploys on every push to your main branch:
+
+- **Production**: Deploys from `main` branch
+- **Preview**: Deploys from pull requests
+- **Development**: Local development with `npm run dev`
+
+### Performance Optimization
+
+Vercel provides automatic optimizations:
+- ✅ Edge caching
+- ✅ Image optimization
+- ✅ Automatic HTTPS
+- ✅ Global CDN
+
+### Monitoring
+
+View deployment logs and analytics:
+1. Go to Vercel Dashboard
+2. Select your project
+3. View "Deployments" tab for build logs
+4. View "Analytics" tab for performance metrics
+
+### Additional Resources
+
+- [Vercel Next.js Documentation](https://vercel.com/docs/frameworks/nextjs)
+- [Environment Variables Guide](https://vercel.com/docs/concepts/projects/environment-variables)
+- [Custom Domains Guide](https://vercel.com/docs/concepts/projects/domains)
+
+### Quick Reference Commands
+
+```bash
+# Install Vercel CLI (optional)
+npm install -g vercel
+
+# Deploy from command line
+cd frontend
+vercel
+
+# Deploy to production
+vercel --prod
+```
 
 ---
 

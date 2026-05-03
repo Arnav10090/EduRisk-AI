@@ -11,6 +11,7 @@ import { ShapWaterfallChart } from "@/components/student/ShapWaterfallChart";
 import { AISummaryCard } from "@/components/student/AISummaryCard";
 import { NextBestActionsPanel } from "@/components/student/NextBestActionsPanel";
 import { AuditTrailTimeline } from "@/components/student/AuditTrailTimeline";
+import { RiskTrendChart } from "@/components/student/RiskTrendChart";
 
 interface StudentDetail {
   student_id: string;
@@ -195,8 +196,12 @@ export default function StudentDetailPage() {
                 salaryMin={student.salary_min!}
                 salaryMax={student.salary_max!}
                 salaryConfidence={student.salary_confidence!}
+                emiAffordability={student.emi_affordability ?? undefined}
               />
             </div>
+
+            {/* Risk Score Trend Chart (Requirement 15) */}
+            <RiskTrendChart studentId={studentId} />
 
             {/* AI Summary */}
             {student.ai_summary && (

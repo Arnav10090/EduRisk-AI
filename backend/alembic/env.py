@@ -13,17 +13,25 @@ from alembic import context
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 app_dir = os.path.dirname(backend_dir)
 sys.path.insert(0, app_dir)
-sys.path.insert(0, backend_dir)
 
-# Import Base and models
-from db.session import Base
-from models.student import Student
-from models.prediction import Prediction
-from models.audit_log import AuditLog
+# Import Base and models using backend prefix
+from backend.db.session import Base
+from backend.models.student import Student
+from backend.models.prediction import Prediction
+from backend.models.audit_log import AuditLog
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+# Override sqlalchemy.url with DATABASE_URL from environment if available
+# This enables Docker compatibility where DATABASE_URL is set via docker-compose
+database_url = os.getenv("DATABASE_URL")
+if database_url:
+    config.set_main_option("sqlalchemy.url", database_url)
+    print(f"✅ Using DATABASE_URL from environment: {database_url}")
+else:
+    print("⚠️  WARNING: DATABASE_URL not found in environment, using alembic.ini value")
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

@@ -18,6 +18,7 @@ import logging
 from backend.db.session import get_db
 from backend.models.prediction import Prediction
 from backend.models.student import Student
+from backend.routes.auth import get_current_user
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -44,10 +45,13 @@ async def get_alerts(
     threshold: str = Query(default="high", description="Risk threshold filter (high, medium, low)"),
     limit: int = Query(default=50, ge=1, le=500, description="Maximum number of alerts to return"),
     offset: int = Query(default=0, ge=0, description="Number of alerts to skip for pagination"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Retrieve list of high-risk students requiring immediate attention.
+    
+    **Protected Route**: Requires valid JWT token in Authorization header.
     
     This endpoint returns students filtered by risk threshold, sorted by
     risk score in descending order, with pagination support.
@@ -57,14 +61,20 @@ async def get_alerts(
         limit: Maximum number of results (default 50, max 500)
         offset: Pagination offset (default 0)
         db: Database session (injected)
+        current_user: Authenticated user information (injected from JWT)
         
     Returns:
         List of AlertResponse objects with student and prediction details
         
     Raises:
+        HTTPException 401: Invalid or expired JWT token
         HTTPException 500: Internal server error
         
     Requirements:
+        - 7.3.1: Use get_current_user() dependency for JWT authentication
+        - 7.3.2: Extract and validate JWT from Authorization header
+        - 7.3.3: Return user information from JWT payload
+        - 7.3.4: Raise 401 exception for invalid/expired tokens
         - 11.1: Accept optional query parameters: threshold, limit, offset
         - 11.2: Return students where risk_level="high" OR emi_affordability>0.5
         - 11.3: Default threshold to "high" when omitted
@@ -75,7 +85,7 @@ async def get_alerts(
     """
     try:
         logger.info(
-            f"Retrieving alerts with threshold={threshold}, limit={limit}, offset={offset}"
+            f"User '{current_user['username']}' retrieving alerts with threshold={threshold}, limit={limit}, offset={offset}"
         )
         
         # Build query with joins (Requirement 11.6)

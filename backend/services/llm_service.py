@@ -9,6 +9,8 @@ Supports both Groq and Anthropic Claude APIs.
 import asyncio
 from typing import Dict, List, Optional
 import os
+import logging
+import time
 
 try:
     import anthropic
@@ -22,6 +24,8 @@ try:
     GROQ_AVAILABLE = True
 except ImportError:
     GROQ_AVAILABLE = False
+
+logger = logging.getLogger(__name__)
 
 
 class LLMService:
@@ -71,6 +75,11 @@ class LLMService:
         self.fallback_message = (
             "AI summary unavailable - refer to SHAP values for risk drivers."
         )
+        
+        # Rate limiting configuration (Requirement 30)
+        self.max_retries = 3
+        self.initial_delay = 1.0  # Start with 1 second
+        self.max_delay = 8.0  # Max delay of 8 seconds
     
     async def generate_summary(
         self,
@@ -84,6 +93,8 @@ class LLMService:
         Creates a 2-sentence plain-English explanation of the student's
         placement risk assessment, suitable for loan officers without
         technical ML knowledge.
+        
+        Implements exponential backoff for rate limit handling (Requirement 30).
         
         Args:
             student_data: Dictionary containing student information with keys:
@@ -113,6 +124,11 @@ class LLMService:
             - 6.4: Limit to 2 sentences maximum
             - 6.5: Start with risk level and primary driver
             - 6.7: Return fallback message on API failures
+            - 30.1: Implement exponential backoff for rate limit errors
+            - 30.2: Retry up to 3 times with increasing delays
+            - 30.3: Parse Retry-After header if present
+            - 30.4: Return fallback after max retries
+            - 30.5: Log rate limit events
         
         Examples:
             >>> service = LLMService(api_key="...")
@@ -139,58 +155,153 @@ class LLMService:
             "Medium risk student with limited internship experience being the primary concern. 
             Decent CGPA provides some offset, but additional practical experience recommended."
         """
-        try:
-            # Build the prompt with student and prediction data
-            prompt = self._build_prompt(student_data, prediction, top_risk_drivers)
-            
-            # Call LLM API based on provider
-            if self.provider == "groq":
-                response = await asyncio.wait_for(
-                    self.client.chat.completions.create(
-                        model=self.model,
-                        messages=[
-                            {
-                                "role": "system",
-                                "content": "You are a credit risk analyst at an Indian NBFC. Provide concise, professional risk assessments."
-                            },
-                            {
-                                "role": "user",
-                                "content": prompt
-                            }
-                        ],
-                        max_tokens=self.max_tokens,
-                        temperature=self.temperature
-                    ),
-                    timeout=self.timeout
-                )
-                summary = response.choices[0].message.content.strip()
+        # Build the prompt with student and prediction data
+        prompt = self._build_prompt(student_data, prediction, top_risk_drivers)
+        
+        # Implement exponential backoff for rate limiting (Requirement 30)
+        for attempt in range(self.max_retries + 1):
+            try:
+                # Call LLM API based on provider
+                if self.provider == "groq":
+                    response = await asyncio.wait_for(
+                        self.client.chat.completions.create(
+                            model=self.model,
+                            messages=[
+                                {
+                                    "role": "system",
+                                    "content": "You are a credit risk analyst at an Indian NBFC. Provide concise, professional risk assessments."
+                                },
+                                {
+                                    "role": "user",
+                                    "content": prompt
+                                }
+                            ],
+                            max_tokens=self.max_tokens,
+                            temperature=self.temperature
+                        ),
+                        timeout=self.timeout
+                    )
+                    summary = response.choices[0].message.content.strip()
+                    
+                elif self.provider == "anthropic":
+                    response = await asyncio.wait_for(
+                        self.client.messages.create(
+                            model=self.model,
+                            max_tokens=self.max_tokens,
+                            temperature=self.temperature,
+                            messages=[
+                                {
+                                    "role": "user",
+                                    "content": prompt
+                                }
+                            ]
+                        ),
+                        timeout=self.timeout
+                    )
+                    summary = response.content[0].text.strip()
                 
-            elif self.provider == "anthropic":
-                response = await asyncio.wait_for(
-                    self.client.messages.create(
-                        model=self.model,
-                        max_tokens=self.max_tokens,
-                        temperature=self.temperature,
-                        messages=[
-                            {
-                                "role": "user",
-                                "content": prompt
-                            }
-                        ]
-                    ),
-                    timeout=self.timeout
+                return summary
+                
+            except asyncio.TimeoutError:
+                # Timeout occurred - don't retry, return fallback immediately
+                logger.warning(f"LLM API timeout after {self.timeout}s")
+                return self.fallback_message
+                
+            except Exception as e:
+                error_str = str(e)
+                
+                # Check if this is a rate limit error (429)
+                is_rate_limit = (
+                    "429" in error_str or
+                    "rate limit" in error_str.lower() or
+                    "too many requests" in error_str.lower()
                 )
-                summary = response.content[0].text.strip()
+                
+                # Check if this is an authentication error (401) - don't retry
+                is_auth_error = (
+                    "401" in error_str or
+                    "unauthorized" in error_str.lower() or
+                    "authentication" in error_str.lower()
+                )
+                
+                if is_auth_error:
+                    logger.warning(f"LLM API authentication error: {error_str}")
+                    return self.fallback_message
+                
+                if is_rate_limit:
+                    # Rate limit detected (Requirement 30.1)
+                    if attempt < self.max_retries:
+                        # Calculate exponential backoff delay (Requirement 30.2)
+                        delay = min(self.initial_delay * (2 ** attempt), self.max_delay)
+                        
+                        # Try to parse Retry-After header if available (Requirement 30.3)
+                        retry_after = self._parse_retry_after(e)
+                        if retry_after is not None:
+                            delay = min(retry_after, self.max_delay)
+                        
+                        # Log rate limit event (Requirement 30.5)
+                        logger.warning(
+                            f"Rate limit hit (attempt {attempt + 1}/{self.max_retries + 1}). "
+                            f"Retrying in {delay}s... Error: {error_str}"
+                        )
+                        
+                        await asyncio.sleep(delay)
+                        continue  # Retry
+                    else:
+                        # Max retries exhausted (Requirement 30.4)
+                        logger.error(
+                            f"Rate limit: Max retries ({self.max_retries}) exhausted. "
+                            f"Returning fallback message."
+                        )
+                        return self.fallback_message
+                else:
+                    # Other API error (network, etc.) - return fallback immediately
+                    logger.warning(f"LLM API error: {error_str}")
+                    return self.fallback_message
+        
+        # Should not reach here, but return fallback as safety
+        return self.fallback_message
+    
+    def _parse_retry_after(self, exception: Exception) -> Optional[float]:
+        """
+        Parse Retry-After header from exception if present.
+        
+        Args:
+            exception: The exception that was raised
+        
+        Returns:
+            Retry-After delay in seconds, or None if not found
+        
+        Requirements:
+            - 30.3: Parse Retry-After header if present
+        """
+        try:
+            error_str = str(exception)
             
-            return summary
+            # Try to extract Retry-After from error message
+            # Common formats: "Retry-After: 5" or "retry after 5 seconds"
+            if "retry-after" in error_str.lower():
+                # Extract number from error string
+                import re
+                match = re.search(r'retry[-_\s]after[:\s]+(\d+)', error_str, re.IGNORECASE)
+                if match:
+                    return float(match.group(1))
             
-        except asyncio.TimeoutError:
-            # Timeout occurred
-            return self.fallback_message
-            
-        except Exception as e:
-            # Any API error (rate limit, auth, network, etc.)
-            return self.fallback_message
+            # Check if exception has response attribute (common in HTTP libraries)
+            if hasattr(exception, 'response') and exception.response is not None:
+                response = exception.response
+                if hasattr(response, 'headers'):
+                    retry_after = response.headers.get('Retry-After') or response.headers.get('retry-after')
+                    if retry_after:
+                        try:
+                            return float(retry_after)
+                        except ValueError:
+                            pass
+        except Exception:
+            # If parsing fails, return None
+            pass
+        
+        return None
     
     def _build_prompt(
         self,

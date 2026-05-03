@@ -11,6 +11,7 @@ Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func, or_
+from sqlalchemy.orm import joinedload, selectinload
 from typing import List, Optional
 from decimal import Decimal
 import logging
@@ -18,6 +19,7 @@ import logging
 from backend.db.session import get_db
 from backend.models.student import Student
 from backend.models.prediction import Prediction
+from backend.routes.auth import get_current_user
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -98,10 +100,13 @@ async def list_students(
     order: str = Query(default="desc", description="Sort order (asc or desc)"),
     limit: int = Query(default=20, ge=1, le=500, description="Maximum number of students to return"),
     offset: int = Query(default=0, ge=0, description="Number of students to skip for pagination"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Retrieve list of all students with their latest predictions.
+    
+    **Protected Route**: Requires valid JWT token in Authorization header.
     
     This endpoint supports search, sorting, and pagination for viewing
     the complete student portfolio with risk assessments.
@@ -113,14 +118,20 @@ async def list_students(
         limit: Maximum number of results (default 20, max 500)
         offset: Pagination offset (default 0)
         db: Database session (injected)
+        current_user: Authenticated user information (injected from JWT)
         
     Returns:
         StudentListResponse with array of students and total count
         
     Raises:
+        HTTPException 401: Invalid or expired JWT token
         HTTPException 500: Internal server error
         
     Requirements:
+        - 7.3.1: Use get_current_user() dependency for JWT authentication
+        - 7.3.2: Extract and validate JWT from Authorization header
+        - 7.3.3: Return user information from JWT payload
+        - 7.3.4: Raise 401 exception for invalid/expired tokens
         - 12.1: Accept optional query parameters: search, sort, order, limit, offset
         - 12.2: Filter students by name using case-insensitive partial matching
         - 12.3: Sort by specified column (risk_score, name, course_type, institute_tier, created_at)
@@ -131,33 +142,13 @@ async def list_students(
     """
     try:
         logger.info(
-            f"Listing students with search={search}, sort={sort}, order={order}, "
+            f"User '{current_user['username']}' listing students with search={search}, sort={sort}, order={order}, "
             f"limit={limit}, offset={offset}"
         )
         
-        # Subquery to get latest prediction for each student (Requirement 12.6)
-        latest_prediction_subquery = (
-            select(
-                Prediction.student_id,
-                func.max(Prediction.created_at).label("max_created_at")
-            )
-            .group_by(Prediction.student_id)
-            .subquery()
-        )
-        
-        # Main query with left join to get students with their latest prediction
-        query = (
-            select(Student, Prediction)
-            .outerjoin(
-                latest_prediction_subquery,
-                Student.id == latest_prediction_subquery.c.student_id
-            )
-            .outerjoin(
-                Prediction,
-                (Prediction.student_id == Student.id) &
-                (Prediction.created_at == latest_prediction_subquery.c.max_created_at)
-            )
-        )
+        # Build query with eager loading to avoid N+1 pattern (Requirement 26.1, 26.2)
+        # Use joinedload() to fetch students with their predictions in a single query
+        query = select(Student).options(joinedload(Student.predictions))
         
         # Apply search filter (Requirement 12.2)
         if search:
@@ -165,9 +156,32 @@ async def list_students(
             query = query.where(Student.name.ilike(search_pattern))
         
         # Apply sorting (Requirements 12.3, 12.4)
-        sort_column = Student.created_at  # Default
-        
+        # Note: When sorting by prediction fields, we need to join with predictions
         if sort == "risk_score":
+            # For risk_score sorting, we need to join with the latest prediction
+            # Use a subquery to get the latest prediction per student
+            latest_prediction_subquery = (
+                select(
+                    Prediction.student_id,
+                    func.max(Prediction.created_at).label("max_created_at")
+                )
+                .group_by(Prediction.student_id)
+                .subquery()
+            )
+            
+            query = (
+                query
+                .outerjoin(
+                    latest_prediction_subquery,
+                    Student.id == latest_prediction_subquery.c.student_id
+                )
+                .outerjoin(
+                    Prediction,
+                    (Prediction.student_id == Student.id) &
+                    (Prediction.created_at == latest_prediction_subquery.c.max_created_at)
+                )
+            )
+            
             sort_column = Prediction.risk_score
         elif sort == "name":
             sort_column = Student.name
@@ -199,13 +213,14 @@ async def list_students(
         # Apply pagination (Requirement 12.5)
         query = query.limit(limit).offset(offset)
         
-        # Execute query
+        # Execute query with eager loading (Requirement 26.1, 26.4)
         result = await db.execute(query)
-        rows = result.all()
+        students = result.unique().scalars().all()
         
         # Format response (Requirement 12.7)
-        students = []
-        for student, prediction in rows:
+        # Predictions are already loaded via joinedload(), no additional queries needed
+        students_response = []
+        for student in students:
             student_data = StudentWithPrediction(
                 student_id=str(student.id),
                 name=student.name,
@@ -217,26 +232,27 @@ async def list_students(
                 created_at=student.created_at.isoformat()
             )
             
-            # Add prediction data if available
-            if prediction:
-                student_data.prediction_id = str(prediction.id)
-                student_data.risk_score = prediction.risk_score
-                student_data.risk_level = prediction.risk_level
-                student_data.prob_placed_3m = prediction.prob_placed_3m
-                student_data.prob_placed_6m = prediction.prob_placed_6m
-                student_data.prob_placed_12m = prediction.prob_placed_12m
-                student_data.alert_triggered = prediction.alert_triggered
-                student_data.prediction_created_at = prediction.created_at.isoformat()
+            # Get latest prediction from already-loaded predictions (no N+1 query)
+            if student.predictions:
+                latest_prediction = max(student.predictions, key=lambda p: p.created_at)
+                student_data.prediction_id = str(latest_prediction.id)
+                student_data.risk_score = latest_prediction.risk_score
+                student_data.risk_level = latest_prediction.risk_level
+                student_data.prob_placed_3m = latest_prediction.prob_placed_3m
+                student_data.prob_placed_6m = latest_prediction.prob_placed_6m
+                student_data.prob_placed_12m = latest_prediction.prob_placed_12m
+                student_data.alert_triggered = latest_prediction.alert_triggered
+                student_data.prediction_created_at = latest_prediction.created_at.isoformat()
             
-            students.append(student_data)
+            students_response.append(student_data)
         
         logger.info(
-            f"Retrieved {len(students)} students (total: {total_count}) "
-            f"with search={search}, sort={sort}"
+            f"Retrieved {len(students_response)} students (total: {total_count}) "
+            f"with search={search}, sort={sort} using optimized query"
         )
         
         return StudentListResponse(
-            students=students,
+            students=students_response,
             total_count=total_count
         )
         
@@ -251,10 +267,13 @@ async def list_students(
 @router.get("/students/{student_id}", response_model=StudentDetailResponse, status_code=status.HTTP_200_OK)
 async def get_student_detail(
     student_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Retrieve detailed information for a specific student with their latest prediction.
+    
+    **Protected Route**: Requires valid JWT token in Authorization header.
     
     This endpoint returns complete student data including all prediction fields
     needed for the student detail page (SHAP values, AI summary, actions, etc.).
@@ -262,21 +281,33 @@ async def get_student_detail(
     Args:
         student_id: UUID of the student
         db: Database session (injected)
+        current_user: Authenticated user information (injected from JWT)
         
     Returns:
         StudentDetailResponse with complete student and prediction data
         
     Raises:
+        HTTPException 401: Invalid or expired JWT token
         HTTPException 404: Student not found
         HTTPException 500: Internal server error
+        
+    Requirements:
+        - 7.3.1: Use get_current_user() dependency for JWT authentication
+        - 7.3.2: Extract and validate JWT from Authorization header
+        - 7.3.3: Return user information from JWT payload
+        - 7.3.4: Raise 401 exception for invalid/expired tokens
     """
     try:
-        logger.info(f"Fetching detail for student {student_id}")
+        logger.info(f"User '{current_user['username']}' fetching detail for student {student_id}")
         
-        # Query student
-        student_query = select(Student).where(Student.id == student_id)
+        # Query student with eager loading of predictions (Requirement 26.1)
+        student_query = (
+            select(Student)
+            .options(joinedload(Student.predictions))
+            .where(Student.id == student_id)
+        )
         student_result = await db.execute(student_query)
-        student = student_result.scalar_one_or_none()
+        student = student_result.unique().scalar_one_or_none()
         
         if not student:
             logger.warning(f"Student {student_id} not found")
@@ -285,15 +316,10 @@ async def get_student_detail(
                 detail=f"Student with ID {student_id} not found"
             )
         
-        # Query latest prediction
-        prediction_query = (
-            select(Prediction)
-            .where(Prediction.student_id == student_id)
-            .order_by(desc(Prediction.created_at))
-            .limit(1)
-        )
-        prediction_result = await db.execute(prediction_query)
-        prediction = prediction_result.scalar_one_or_none()
+        # Get latest prediction from already-loaded predictions (no additional query)
+        prediction = None
+        if student.predictions:
+            prediction = max(student.predictions, key=lambda p: p.created_at)
         
         # Build response
         response = StudentDetailResponse(
@@ -326,7 +352,7 @@ async def get_student_detail(
             response.alert_triggered = prediction.alert_triggered
             response.prediction_created_at = prediction.created_at.isoformat()
         
-        logger.info(f"Retrieved detail for student {student_id}")
+        logger.info(f"Retrieved detail for student {student_id} using optimized query")
         return response
         
     except HTTPException:
@@ -342,10 +368,13 @@ async def get_student_detail(
 @router.get("/students/{student_id}/predictions", response_model=List[PredictionHistoryEntry], status_code=status.HTTP_200_OK)
 async def get_student_predictions(
     student_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Retrieve prediction history for a specific student.
+    
+    **Protected Route**: Requires valid JWT token in Authorization header.
     
     This endpoint returns all predictions for a student, ordered by date descending,
     for display in the audit trail timeline.
@@ -353,16 +382,24 @@ async def get_student_predictions(
     Args:
         student_id: UUID of the student
         db: Database session (injected)
+        current_user: Authenticated user information (injected from JWT)
         
     Returns:
         List of PredictionHistoryEntry objects
         
     Raises:
+        HTTPException 401: Invalid or expired JWT token
         HTTPException 404: Student not found
         HTTPException 500: Internal server error
+        
+    Requirements:
+        - 7.3.1: Use get_current_user() dependency for JWT authentication
+        - 7.3.2: Extract and validate JWT from Authorization header
+        - 7.3.3: Return user information from JWT payload
+        - 7.3.4: Raise 401 exception for invalid/expired tokens
     """
     try:
-        logger.info(f"Fetching prediction history for student {student_id}")
+        logger.info(f"User '{current_user['username']}' fetching prediction history for student {student_id}")
         
         # Verify student exists
         student_query = select(Student).where(Student.id == student_id)
@@ -407,3 +444,107 @@ async def get_student_predictions(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve prediction history: {str(e)}"
         )
+
+
+class DashboardHeatmapResponse(BaseModel):
+    """Response model for dashboard heatmap data."""
+    students: List[StudentWithPrediction]
+    high_risk_count: int
+    total_students: int
+
+
+@router.get("/dashboard/heatmap", response_model=DashboardHeatmapResponse, status_code=status.HTTP_200_OK)
+async def get_dashboard_heatmap(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get dashboard heatmap data with optimized queries.
+    
+    **Protected Route**: Requires valid JWT token in Authorization header.
+    
+    This endpoint executes at most 2 database queries to fetch all data needed
+    for the dashboard heatmap visualization.
+    
+    Args:
+        db: Database session (injected)
+        current_user: Authenticated user information (injected from JWT)
+        
+    Returns:
+        DashboardHeatmapResponse with students and high-risk count
+        
+    Raises:
+        HTTPException 401: Invalid or expired JWT token
+        HTTPException 500: Internal server error
+        
+    Requirements:
+        - 26.4: Execute at most 2 database queries for dashboard heatmap
+        - 26.1: Use joinedload() to avoid N+1 queries
+    """
+    try:
+        logger.info(f"User '{current_user['username']}' fetching dashboard heatmap")
+        
+        # Query 1: Get all students with their predictions using joinedload (Requirement 26.1, 26.4)
+        students_query = (
+            select(Student)
+            .options(joinedload(Student.predictions))
+            .order_by(desc(Student.created_at))
+        )
+        students_result = await db.execute(students_query)
+        students = students_result.unique().scalars().all()
+        
+        # Query 2: Get high-risk alert count (Requirement 26.4)
+        high_risk_query = (
+            select(func.count())
+            .select_from(Prediction)
+            .where(Prediction.risk_level == "high")
+        )
+        high_risk_result = await db.execute(high_risk_query)
+        high_risk_count = high_risk_result.scalar()
+        
+        # Format response - predictions already loaded, no N+1 queries
+        students_response = []
+        for student in students:
+            student_data = StudentWithPrediction(
+                student_id=str(student.id),
+                name=student.name,
+                course_type=student.course_type,
+                institute_name=student.institute_name,
+                institute_tier=student.institute_tier,
+                cgpa=student.cgpa,
+                year_of_grad=student.year_of_grad,
+                created_at=student.created_at.isoformat()
+            )
+            
+            # Get latest prediction from already-loaded predictions
+            if student.predictions:
+                latest_prediction = max(student.predictions, key=lambda p: p.created_at)
+                student_data.prediction_id = str(latest_prediction.id)
+                student_data.risk_score = latest_prediction.risk_score
+                student_data.risk_level = latest_prediction.risk_level
+                student_data.prob_placed_3m = latest_prediction.prob_placed_3m
+                student_data.prob_placed_6m = latest_prediction.prob_placed_6m
+                student_data.prob_placed_12m = latest_prediction.prob_placed_12m
+                student_data.alert_triggered = latest_prediction.alert_triggered
+                student_data.prediction_created_at = latest_prediction.created_at.isoformat()
+            
+            students_response.append(student_data)
+        
+        logger.info(
+            f"Dashboard heatmap loaded with 2 queries: {len(students_response)} students, "
+            f"{high_risk_count} high-risk alerts"
+        )
+        
+        return DashboardHeatmapResponse(
+            students=students_response,
+            high_risk_count=high_risk_count,
+            total_students=len(students_response)
+        )
+        
+    except Exception as e:
+        logger.error(f"Error fetching dashboard heatmap: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve dashboard heatmap: {str(e)}"
+        )
+

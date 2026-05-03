@@ -24,6 +24,7 @@ from .llm_service import LLMService
 from .risk_calculator import calculate_risk_score, assign_risk_level, calculate_emi_affordability
 from .action_recommender import generate_actions
 from .audit_logger import AuditLogger
+from .alert_service import AlertService
 from ..models.student import Student
 from ..models.prediction import Prediction
 from ..schemas.student import StudentInput
@@ -78,12 +79,16 @@ class PredictionService:
         # Initialize SHAP explainer with the 3-month model
         # (We use 3m model for explanations as it's the primary risk indicator)
         self.shap_explainer = ShapExplainer(placement_predictor.model_3m)
+        
+        # Initialize alert service for high-risk notifications (Requirement 32.2)
+        self.alert_service = AlertService()
     
     async def predict_student(
         self,
         student_data: StudentInput,
         db: AsyncSession,
-        performed_by: Optional[str] = "system"
+        performed_by: Optional[str] = "system",
+        compute_shap: bool = True
     ) -> PredictionResponse:
         """
         Generate complete prediction for a student.
@@ -95,7 +100,7 @@ class PredictionService:
         4. Get salary prediction with confidence interval
         5. Compute risk score and level
         6. Compute EMI affordability
-        7. Generate SHAP explanation
+        7. Generate SHAP explanation (optional, can be skipped for batch requests)
         8. Generate AI summary (async)
         9. Generate next-best action recommendations
         10. Store prediction in database
@@ -106,6 +111,7 @@ class PredictionService:
             student_data: Validated student input data
             db: Async database session
             performed_by: User or system identifier for audit logging
+            compute_shap: Whether to compute SHAP values (default True, set False for batch)
             
         Returns:
             PredictionResponse with all prediction results
@@ -119,6 +125,7 @@ class PredictionService:
             - 8.3: Invoke all ML components in sequence
             - 8.4: Store complete prediction in predictions table
             - 8.5: Return JSON response with all fields
+            - 27.2: Support skipping SHAP computation for batch requests
         """
         # Step 1: Create student record (Requirement 8.2)
         student = await self._create_student_record(student_data, db)
@@ -151,8 +158,15 @@ class PredictionService:
                 salary_pred.predicted
             )
         
-        # Step 7: Generate SHAP explanation (Requirement 8.3)
-        shap_explanation = self.shap_explainer.explain(features, feature_names)
+        # Step 7: Generate SHAP explanation (Requirement 8.3, optional for batch - Requirement 27.2)
+        if compute_shap:
+            shap_explanation = self.shap_explainer.explain(features, feature_names)
+            shap_values = shap_explanation.shap_values
+            top_risk_drivers = shap_explanation.top_drivers
+        else:
+            # For batch requests, set SHAP values to empty/null (Requirement 27.3)
+            shap_values = {}
+            top_risk_drivers = []
         
         # Step 8: Generate AI summary (Requirement 8.3)
         ai_summary = await self._generate_ai_summary(
@@ -160,14 +174,14 @@ class PredictionService:
             placement_pred,
             risk_score,
             risk_level,
-            shap_explanation.top_drivers
+            top_risk_drivers
         )
         
         # Step 9: Generate next-best actions (Requirement 8.3)
         actions = self._generate_actions(
             risk_level,
             risk_score,
-            shap_explanation.top_drivers,
+            top_risk_drivers,
             student_dict,
             placement_pred
         )
@@ -188,8 +202,8 @@ class PredictionService:
             risk_score=risk_score,
             risk_level=risk_level,
             emi_affordability=emi_affordability,
-            shap_values=shap_explanation.shap_values,
-            top_risk_drivers=shap_explanation.top_drivers,
+            shap_values=shap_values,
+            top_risk_drivers=top_risk_drivers,
             ai_summary=ai_summary,
             next_best_actions=actions,
             alert_triggered=alert_triggered,
@@ -208,7 +222,16 @@ class PredictionService:
             performed_by=performed_by
         )
         
-        # Step 13: Return complete response (Requirement 8.5)
+        # Step 13: Trigger alert for high-risk students (Requirement 32.2)
+        if risk_level == "high":
+            await self.alert_service.send_high_risk_alert(
+                student=student,
+                prediction=prediction,
+                db=db,
+                performed_by=performed_by
+            )
+        
+        # Step 14: Return complete response (Requirement 8.5)
         return self._build_response(
             student_id=student.id,
             prediction_id=prediction.id,
@@ -217,7 +240,7 @@ class PredictionService:
             risk_score=risk_score,
             risk_level=risk_level,
             emi_affordability=emi_affordability,
-            top_risk_drivers=shap_explanation.top_drivers,
+            top_risk_drivers=top_risk_drivers,
             ai_summary=ai_summary,
             next_best_actions=actions,
             alert_triggered=alert_triggered

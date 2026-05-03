@@ -1,44 +1,44 @@
 {
   "version": "1.0.0",
-  "training_date": "2026-04-30T22:50:01.168464",
+  "training_date": "2026-05-02T23:16:32.474050",
   "models": {
     "placement_3m": {
       "type": "XGBoostClassifier",
       "file": "placement_model_3m.pkl",
       "metrics": {
-        "auc_roc": 0.8262060207736563,
-        "f1": 0.8594377510040161,
-        "precision": 0.8178343949044586,
-        "recall": 0.9055007052186178
+        "auc_roc": 0.8260121462395611,
+        "f1": 0.8636668905305575,
+        "precision": 0.8243589743589743,
+        "recall": 0.9069111424541608
       }
     },
     "placement_6m": {
       "type": "XGBoostClassifier",
       "file": "placement_model_6m.pkl",
       "metrics": {
-        "auc_roc": 0.8888809854062193,
-        "f1": 0.9542553191489361,
-        "precision": 0.9218910585817061,
-        "recall": 0.9889746416758545
+        "auc_roc": 0.8910386361750304,
+        "f1": 0.9536987759446514,
+        "precision": 0.9218106995884774,
+        "recall": 0.9878721058434399
       }
     },
     "placement_12m": {
       "type": "XGBoostClassifier",
       "file": "placement_model_12m.pkl",
       "metrics": {
-        "auc_roc": 0.9263803680981595,
-        "f1": 0.9888663967611336,
-        "precision": 0.9789579158316634,
-        "recall": 0.9989775051124744
+        "auc_roc": 0.9255437813720021,
+        "f1": 0.988342625443487,
+        "precision": 0.9798994974874372,
+        "recall": 0.9969325153374233
       }
     },
     "salary": {
       "type": "Ridge",
       "file": "salary_model.pkl",
       "metrics": {
-        "mae": 2.2167773946484997,
-        "rmse": 3.0508538546798083,
-        "r2": 0.5502476597311851
+        "mae": 2.2167774410543726,
+        "rmse": 3.0508538829503036,
+        "r2": 0.5502476513959962
       }
     }
   },
@@ -48,9 +48,11 @@
   },
   "training_config": {
     "data_source": "synthetic",
-    "n_records": 5000,
+    "n_synthetic_records": 5000,
+    "n_kaggle_records": 0,
+    "n_total_records": 5000,
     "train_test_split": 0.8,
-    "cv_folds": 5,
+    "cv_folds": 3,
     "random_seed": 42
   }
 }

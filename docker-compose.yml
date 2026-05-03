@@ -5,15 +5,15 @@ services:
       dockerfile: docker/Dockerfile.postgres
     container_name: edurisk-postgres
     environment:
-      POSTGRES_USER: edurisk
-      POSTGRES_PASSWORD: edurisk_password
-      POSTGRES_DB: edurisk_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U edurisk"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -41,14 +41,15 @@ services:
       dockerfile: docker/Dockerfile.backend
     container_name: edurisk-backend
     environment:
-      DATABASE_URL: postgresql+asyncpg://edurisk:edurisk_password@postgres:5432/edurisk_db
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379/0
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_PROVIDER: ${LLM_PROVIDER:-groq}
       ML_MODEL_PATH: /app/ml/models
       SECRET_KEY: ${SECRET_KEY:-dev_secret_key_change_in_production}
-      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://frontend:3000
-      DEBUG: ${DEBUG:-True}
+      API_KEY: ${API_KEY:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://frontend:3000}
+      DEBUG: ${DEBUG:-False}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
       - "8000:8000"

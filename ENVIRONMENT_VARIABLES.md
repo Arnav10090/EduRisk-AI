@@ -35,13 +35,30 @@ Complete reference for all environment variables used in the EduRisk AI system.
 - **Required**: Yes
 - **Default**: None
 
-#### ANTHROPIC_API_KEY
-- **Description**: Anthropic API key for Claude AI summaries
-- **Format**: `sk-ant-...`
-- **Example**: `sk-ant-api03-1234567890abcdef...`
-- **Required**: Yes (for AI summaries)
+#### LLM_API_KEY
+- **Description**: API key for LLM integration (Groq or Anthropic) for AI-powered risk summaries
+- **Format**: Provider-specific format (e.g., `gsk_...` for Groq, `sk-ant-...` for Anthropic)
+- **Example**: `gsk_1234567890abcdef...` (Groq) or `sk-ant-api03-1234567890abcdef...` (Anthropic)
+- **Required**: No (optional - system degrades gracefully without LLM)
 - **Default**: None
-- **Note**: Get your API key from https://console.anthropic.com/
+- **Note**: Get Groq API key from https://console.groq.com/ or Anthropic key from https://console.anthropic.com/
+
+#### LLM_PROVIDER
+- **Description**: LLM provider to use for AI summaries
+- **Format**: `groq` or `anthropic`
+- **Example**: `groq`
+- **Required**: No (only needed if LLM_API_KEY is provided)
+- **Default**: `groq`
+- **Note**: Groq offers faster inference; Anthropic offers Claude models
+
+#### API_KEY
+- **Description**: API key for authenticating requests to protected endpoints
+- **Format**: Any secure string (32+ characters recommended)
+- **Example**: `edurisk_api_key_change_in_production_12345`
+- **Required**: No (if not set, authentication is disabled with warning)
+- **Default**: None
+- **Note**: All endpoints except /api/health, /docs, /redoc, /openapi.json, and / require this key via X-API-Key header
+- **Generate**: `python -c "import secrets; print('edurisk_' + secrets.token_urlsafe(32))"`
 
 #### ML_MODEL_PATH
 - **Description**: Path to ML models directory
@@ -68,12 +85,16 @@ Complete reference for all environment variables used in the EduRisk AI system.
 - **Default**: `http://localhost:3000`
 
 #### DEBUG
-- **Description**: Enable debug mode
+- **Description**: Enable debug mode with detailed error messages and stack traces
 - **Format**: `True` or `False`
 - **Example**: `False`
 - **Required**: No
-- **Default**: `True`
-- **Note**: Set to `False` in production
+- **Default**: `False`
+- **Note**: **IMPORTANT - Set to `False` in production to prevent stack trace exposure**
+- **Behavior**:
+  - `DEBUG=True`: Detailed stack traces in API error responses, verbose logging, helpful for development
+  - `DEBUG=False`: Generic error messages without stack traces, production-safe error handling
+- **Security Warning**: Never set `DEBUG=True` in production as it exposes sensitive system information
 
 #### LOG_LEVEL
 - **Description**: Logging level
@@ -133,10 +154,21 @@ Complete reference for all environment variables used in the EduRisk AI system.
 
 These variables are used in `docker-compose.yml` and should be set in the `.env` file at the project root.
 
-### ANTHROPIC_API_KEY
-- **Description**: Anthropic API key (passed to backend)
-- **Required**: Yes
-- **Example**: `sk-ant-api03-1234567890abcdef...`
+### LLM_API_KEY
+- **Description**: LLM API key (passed to backend) - optional
+- **Required**: No
+- **Example**: `gsk_1234567890abcdef...` (Groq)
+
+### LLM_PROVIDER
+- **Description**: LLM provider selection (passed to backend) - optional
+- **Required**: No
+- **Default**: `groq`
+- **Example**: `groq` or `anthropic`
+
+### API_KEY
+- **Description**: API authentication key (passed to backend) - optional but recommended
+- **Required**: No (authentication disabled if not set)
+- **Example**: `edurisk_api_key_change_in_production_12345`
 
 ### SECRET_KEY
 - **Description**: Secret key (passed to backend)
@@ -146,7 +178,8 @@ These variables are used in `docker-compose.yml` and should be set in the `.env`
 ### DEBUG
 - **Description**: Debug mode (passed to backend)
 - **Required**: No
-- **Default**: `True`
+- **Default**: `False`
+- **Note**: Set to `True` only for local development
 
 ### LOG_LEVEL
 - **Description**: Logging level (passed to backend)
@@ -271,6 +304,78 @@ When disabled (`False`), logs use standard format:
 2025-01-15 10:30:00 INFO backend.services.prediction_service: Prediction generated
 ```
 
+### DEBUG Mode Behavior
+
+The `DEBUG` variable controls error verbosity and stack trace exposure:
+
+#### DEBUG=True (Development Mode)
+
+**API Error Response:**
+```json
+{
+  "detail": "Internal server error",
+  "error": "ValueError: Invalid student data",
+  "traceback": [
+    "File \"/app/backend/routes/predict.py\", line 45, in predict_student",
+    "  result = await prediction_service.predict(student_data)",
+    "File \"/app/backend/services/prediction_service.py\", line 120, in predict",
+    "  raise ValueError('Invalid student data')"
+  ]
+}
+```
+
+**Use Cases:**
+- Local development
+- Debugging issues
+- Understanding error root causes
+- Testing error handling
+
+**Security Risk:** Exposes internal file paths, function names, and system architecture
+
+#### DEBUG=False (Production Mode)
+
+**API Error Response:**
+```json
+{
+  "detail": "An error occurred while processing your request. Please contact support."
+}
+```
+
+**Use Cases:**
+- Production deployments
+- Public-facing APIs
+- Security-conscious environments
+- Compliance requirements
+
+**Benefits:**
+- Hides sensitive system information
+- Prevents information disclosure
+- Professional error messages
+- Logs full errors server-side for debugging
+
+#### Example Configuration
+
+**Development:**
+```env
+DEBUG=True
+LOG_LEVEL=DEBUG
+LOG_JSON_FORMAT=False
+```
+
+**Staging:**
+```env
+DEBUG=False
+LOG_LEVEL=INFO
+LOG_JSON_FORMAT=True
+```
+
+**Production:**
+```env
+DEBUG=False
+LOG_LEVEL=WARNING
+LOG_JSON_FORMAT=True
+```
+
 ---
 
 ## ML Model Variables
@@ -338,8 +443,12 @@ RATE_LIMIT_GET=300      # requests per minute
 ### Development Environment (.env)
 
 ```env
-# API Keys
-ANTHROPIC_API_KEY=sk-ant-api03-dev-key-here
+# API Keys (Optional - system works without LLM)
+LLM_API_KEY=gsk_dev-key-here
+LLM_PROVIDER=groq
+
+# API Authentication (Optional - recommended for security)
+API_KEY=edurisk_dev_api_key_change_me
 
 # Security
 SECRET_KEY=dev-secret-key-change-me
@@ -367,8 +476,12 @@ PORT=8000
 ### Production Environment (.env)
 
 ```env
-# API Keys
-ANTHROPIC_API_KEY=sk-ant-api03-prod-key-here
+# API Keys (Optional - system works without LLM)
+LLM_API_KEY=gsk_prod-key-here
+LLM_PROVIDER=groq
+
+# API Authentication (REQUIRED for production)
+API_KEY=edurisk_prod_api_key_CHANGE_THIS_STRONG_KEY
 
 # Security (CHANGE THESE!)
 SECRET_KEY=prod-secret-key-generated-with-secrets-module
@@ -396,14 +509,18 @@ PORT=8000
 ### Docker Compose (.env)
 
 ```env
-# API Keys
-ANTHROPIC_API_KEY=sk-ant-api03-your-key-here
+# API Keys (Optional - system works without LLM)
+LLM_API_KEY=gsk_your-key-here
+LLM_PROVIDER=groq
+
+# API Authentication (Optional but recommended)
+API_KEY=edurisk_api_key_change_me
 
 # Security
 SECRET_KEY=your-secret-key-here
 
 # Application
-DEBUG=True
+DEBUG=False
 LOG_LEVEL=INFO
 
 # Note: Database and Redis URLs are configured in docker-compose.yml
@@ -429,8 +546,12 @@ DATABASE_URL=postgresql+asyncpg://edurisk:edurisk_password@localhost:5432/eduris
 # Redis
 REDIS_URL=redis://localhost:6379/0
 
-# API Keys
-ANTHROPIC_API_KEY=sk-ant-api03-your-key-here
+# API Keys (Optional - system works without LLM)
+LLM_API_KEY=gsk_your-key-here
+LLM_PROVIDER=groq
+
+# API Authentication (Optional for local dev)
+API_KEY=edurisk_dev_api_key
 
 # Security
 SECRET_KEY=dev-secret-key
@@ -505,25 +626,38 @@ python test_integration.py
 
 ### Common Issues
 
-**1. "ANTHROPIC_API_KEY variable is not set"**
-- Create `.env` file from `.env.example`
-- Add your Anthropic API key
+**1. "LLM_API_KEY variable is not set" (Warning)**
+- This is just a warning - the system works without LLM integration
+- To enable LLM features: Create `.env` file from `.env.example`
+- Add your Groq or Anthropic API key
+- Set LLM_PROVIDER to `groq` or `anthropic`
 - Restart services
 
-**2. "Database connection failed"**
+**2. "API_KEY not configured - authentication disabled" (Warning)**
+- This is a warning that API authentication is disabled
+- For production: Add API_KEY to `.env` file
+- Generate secure key: `python -c "import secrets; print('edurisk_' + secrets.token_urlsafe(32))"`
+- Restart services
+
+**3. "Database connection failed"**
 - Check `DATABASE_URL` format
 - Verify database is running
 - Check credentials
 
-**3. "CORS error in frontend"**
+**4. "CORS error in frontend"**
 - Add frontend URL to `CORS_ORIGINS`
 - Restart backend
 - Clear browser cache
 
-**4. "Models not found"**
+**5. "Models not found"**
 - Check `ML_MODEL_PATH` points to correct directory
 - Verify model files exist
-- Train models if missing
+- Train models if missing (auto-trains on first boot in Docker)
+
+**6. "Stack traces exposed in production"**
+- Set `DEBUG=False` in `.env`
+- Restart backend
+- Verify error responses don't include stack traces
 
 ### Debug Environment
 
@@ -532,10 +666,10 @@ Enable debug mode to see all environment variables:
 ```bash
 # Backend
 cd backend
-python -c "import os; print('\n'.join(f'{k}={v}' for k, v in os.environ.items() if 'EDURISK' in k or 'DATABASE' in k or 'REDIS' in k))"
+python -c "import os; print('\n'.join(f'{k}={v}' for k, v in os.environ.items() if 'EDURISK' in k or 'DATABASE' in k or 'REDIS' in k or 'LLM' in k or 'API_KEY' in k))"
 
 # Docker
-docker-compose exec backend env | grep -E 'DATABASE|REDIS|ANTHROPIC|SECRET'
+docker-compose exec backend env | grep -E 'DATABASE|REDIS|LLM|API_KEY|SECRET|DEBUG'
 ```
 
 ---

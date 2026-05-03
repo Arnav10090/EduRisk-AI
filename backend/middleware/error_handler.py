@@ -94,15 +94,28 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
                 exc_info=True
             )
             
+            # Check DEBUG mode from environment (Requirement 5.2.1, 5.2.2)
+            import os
+            debug_mode = os.getenv("DEBUG", "False").lower() == "true"
+            
+            # Build error response
+            error_content = {
+                "error": type(e).__name__,
+                "message": e.message,
+                "details": e.details,
+                "path": request.url.path,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            
+            # Include stack trace only in DEBUG mode (Requirement 5.2.2)
+            if debug_mode:
+                error_content["debug_info"] = {
+                    "stack_trace": traceback.format_exc()
+                }
+            
             return JSONResponse(
                 status_code=e.status_code,
-                content={
-                    "error": type(e).__name__,
-                    "message": e.message,
-                    "details": e.details,
-                    "path": request.url.path,
-                    "timestamp": datetime.now(timezone.utc).isoformat()
-                }
+                content=error_content
             )
             
         except RequestValidationError as e:
@@ -177,15 +190,30 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
                 exc_info=True
             )
             
-            # Don't expose internal error details in production
+            # Check DEBUG mode from environment (Requirement 5.2.1, 5.2.2)
+            import os
+            debug_mode = os.getenv("DEBUG", "False").lower() == "true"
+            
+            # Build error response
+            error_content = {
+                "error": "InternalServerError",
+                "message": "An unexpected error occurred. Please try again later.",
+                "path": request.url.path,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            
+            # Include stack trace only in DEBUG mode (Requirement 5.2.2)
+            if debug_mode:
+                error_content["debug_info"] = {
+                    "exception_type": type(e).__name__,
+                    "exception_message": str(e),
+                    "stack_trace": stack_trace
+                }
+            
+            # Don't expose internal error details in production (Requirement 5.2.3)
             return JSONResponse(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                content={
-                    "error": "InternalServerError",
-                    "message": "An unexpected error occurred. Please try again later.",
-                    "path": request.url.path,
-                    "timestamp": datetime.now(timezone.utc).isoformat()
-                }
+                content=error_content
             )
 
 

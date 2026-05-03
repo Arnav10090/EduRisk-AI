@@ -4,10 +4,15 @@ EduRisk AI Backend - Main Application Entry Point
 
 from fastapi import FastAPI
 import os
+import logging
 from dotenv import load_dotenv
 from backend.config import get_config
 from backend.api.router import configure_cors, configure_middleware, include_routes
 from backend.middleware import configure_logging
+from backend.middleware.api_key_auth import ApiKeyMiddleware
+from backend.middleware.query_profiler import QueryProfilerMiddleware
+
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -31,6 +36,15 @@ app = FastAPI(
 
 # Configure CORS middleware
 configure_cors(app, config.cors_origins)
+
+# Configure query profiler in DEBUG mode (Requirement 26.7, Task 11.2)
+debug_mode = os.getenv("DEBUG", "False").lower() == "true"
+if debug_mode:
+    app.add_middleware(QueryProfilerMiddleware)
+    logger.info("✅ Query profiling enabled (DEBUG=True)")
+
+# Configure API key authentication middleware (Requirement 2)
+app.add_middleware(ApiKeyMiddleware)
 
 # Configure other middleware (logging, exception handling, rate limiting)
 configure_middleware(app, config)

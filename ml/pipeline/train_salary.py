@@ -201,7 +201,7 @@ class SalaryModelTrainer:
         # Save model
         model_path = self.model_dir / 'salary_model.pkl'
         joblib.dump(model, model_path)
-        print(f'\n✓ Model saved to {model_path}')
+        print(f'\n[OK] Model saved to {model_path}')
         
         # Store metrics
         self.metrics = metrics
@@ -225,7 +225,7 @@ class SalaryModelTrainer:
         with open(output_path, 'w') as f:
             json.dump(metrics_serializable, f, indent=2)
         
-        print(f'✓ Metrics saved to {output_path}')
+        print(f'[OK] Metrics saved to {output_path}')
 
 
 def main():
@@ -250,7 +250,7 @@ def main():
     trainer.save_metrics()
     
     print('\n' + '=' * 60)
-    print('✓ Training complete!')
+    print('[OK] Training complete!')
     print('=' * 60)
     print('\nSummary:')
     print(f'  - MAE: {metrics["mae"]:.2f} LPA')

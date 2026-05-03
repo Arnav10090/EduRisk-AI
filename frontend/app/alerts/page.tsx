@@ -1,12 +1,31 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { ArrowLeft, AlertCircle, CheckCircle, RefreshCw } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  ArrowLeft,
+  AlertCircle,
+  BellRing,
+  CheckCircle,
+  Clock3,
+  Eye,
+  RefreshCw,
+  ShieldAlert,
+} from "lucide-react";
+import { apiClient } from "@/lib/auth";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Alert {
   student_id: string;
@@ -21,21 +40,63 @@ interface Alert {
   created_at: string;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
-// Fetcher function for SWR
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
-
 // Local storage key for acknowledged alerts
 const ACKNOWLEDGED_ALERTS_KEY = "edurisk_acknowledged_alerts";
+type AlertThreshold = "high" | "medium" | "low" | "all";
+
+async function fetchAlertsByThreshold(threshold: "high" | "medium" | "low"): Promise<Alert[]> {
+  const response = await apiClient(`/api/alerts?threshold=${threshold}&limit=100`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${threshold} alerts`);
+  }
+
+  return response.json();
+}
+
+async function fetchAlerts(threshold: AlertThreshold): Promise<Alert[]> {
+  if (threshold === "all") {
+    const results = await Promise.all([
+      fetchAlertsByThreshold("high"),
+      fetchAlertsByThreshold("medium"),
+      fetchAlertsByThreshold("low"),
+    ]);
+
+    const uniqueAlerts = new Map<string, Alert>();
+
+    for (const group of results) {
+      for (const alert of group) {
+        uniqueAlerts.set(alert.prediction_id, alert);
+      }
+    }
+
+    return Array.from(uniqueAlerts.values()).sort((a, b) => b.risk_score - a.risk_score);
+  }
+
+  return fetchAlertsByThreshold(threshold);
+}
 
 export default function AlertsPage() {
   const router = useRouter();
-  const [selectedThreshold, setSelectedThreshold] = useState<string>("high");
+  const { isAuthenticated, loading: authLoading } = useAuth();
+  const [selectedThreshold, setSelectedThreshold] = useState<AlertThreshold>("high");
   const [acknowledgedAlerts, setAcknowledgedAlerts] = useState<Set<string>>(new Set());
 
-  // Load acknowledged alerts from localStorage on mount
   useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
+    if (!isAuthenticated) {
+      router.push("/login");
+    }
+  }, [authLoading, isAuthenticated, router]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
     const stored = localStorage.getItem(ACKNOWLEDGED_ALERTS_KEY);
     if (stored) {
       try {
@@ -47,38 +108,49 @@ export default function AlertsPage() {
     }
   }, []);
 
-  // Fetch alerts with SWR and 10-second refresh interval (Requirement 28.6)
-  const { data: alerts, error, isLoading, mutate } = useSWR<Alert[]>(
-    `${API_BASE_URL}/api/alerts?threshold=${selectedThreshold}&limit=100`,
-    fetcher,
+  const { data: alerts = [], error, isLoading, mutate } = useSWR<Alert[]>(
+    !authLoading && isAuthenticated ? ["alerts", selectedThreshold] : null,
+    ([, threshold]: [string, AlertThreshold]) => fetchAlerts(threshold),
     {
       refreshInterval: 10000, // 10 seconds
       revalidateOnFocus: true,
     }
   );
 
-  // Filter out acknowledged alerts (Requirement 28.5)
-  const activeAlerts = alerts?.filter(
+  const activeAlerts = alerts.filter(
     (alert) => !acknowledgedAlerts.has(alert.prediction_id)
-  ) || [];
-
-  // Calculate unacknowledged count for badge (Requirement 28.6)
+  );
   const unacknowledgedCount = activeAlerts.length;
+  const acknowledgedCount = alerts.length - activeAlerts.length;
 
-  // Handle acknowledge button click (Requirement 28.4, 28.5)
+  const counts = useMemo(() => {
+    return activeAlerts.reduce(
+      (acc, alert) => {
+        if (alert.risk_level === "high") acc.high += 1;
+        if (alert.risk_level === "medium") acc.medium += 1;
+        if (alert.risk_level === "low") acc.low += 1;
+        return acc;
+      },
+      { high: 0, medium: 0, low: 0 }
+    );
+  }, [activeAlerts]);
+
   const handleAcknowledge = (predictionId: string) => {
     const newAcknowledged = new Set(acknowledgedAlerts);
     newAcknowledged.add(predictionId);
     setAcknowledgedAlerts(newAcknowledged);
-    
-    // Persist to localStorage
+
     localStorage.setItem(
       ACKNOWLEDGED_ALERTS_KEY,
       JSON.stringify(Array.from(newAcknowledged))
     );
   };
 
-  // Get risk level badge color
+  const handleResetAcknowledged = () => {
+    setAcknowledgedAlerts(new Set());
+    localStorage.removeItem(ACKNOWLEDGED_ALERTS_KEY);
+  };
+
   const getRiskBadgeVariant = (riskLevel: string) => {
     switch (riskLevel.toLowerCase()) {
       case "high":
@@ -92,12 +164,9 @@ export default function AlertsPage() {
     }
   };
 
-  // Get recommended action from alert
   const getRecommendedAction = (alert: Alert): string => {
-    // Since the backend doesn't return next_best_actions in the alerts endpoint,
-    // we'll generate a simple recommendation based on the top risk driver
     const driver = alert.top_risk_driver.toLowerCase();
-    
+
     if (driver.includes("internship")) {
       return "Complete at least 1 industry internship or substantial project work";
     } else if (driver.includes("cgpa") || driver.includes("gpa")) {
@@ -111,113 +180,162 @@ export default function AlertsPage() {
     }
   };
 
+  const formatDriver = (value: string) =>
+    value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+  const formatTimestamp = (value: string) =>
+    new Date(value).toLocaleString([], {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="mx-auto mb-4 h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-muted-foreground">Loading alerts...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push("/dashboard")}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-4">
+            <Button variant="outline" size="sm" onClick={() => router.push("/dashboard")}>
+              <ArrowLeft className="h-4 w-4" />
               Back to Dashboard
             </Button>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">High-Risk Alerts</h1>
+              <h1 className="text-3xl font-bold tracking-tight">Alerts Center</h1>
               <p className="text-muted-foreground">
-                Students requiring immediate attention
+                Review students who need immediate intervention and track acknowledged items.
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {/* Unacknowledged count badge (Requirement 28.6) */}
-            <Badge variant="destructive" className="text-lg px-3 py-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="destructive" className="px-3 py-1 text-sm">
               {unacknowledgedCount} Active
             </Badge>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => mutate()}
-              disabled={isLoading}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+            <Badge variant="secondary" className="px-3 py-1 text-sm">
+              {acknowledgedCount} Acknowledged
+            </Badge>
+            <Button variant="outline" size="sm" onClick={() => mutate()} disabled={isLoading}>
+              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
               Refresh
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleResetAcknowledged}>
+              Reset Acknowledged
             </Button>
           </div>
         </div>
 
-        {/* Filter Bar (Requirement 28.1) */}
-        <div className="flex items-center gap-2 p-4 rounded-lg border bg-card">
-          <span className="text-sm font-medium mr-2">Filter by Risk Level:</span>
-          <Button
-            variant={selectedThreshold === "high" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedThreshold("high")}
-          >
-            High Risk
-          </Button>
-          <Button
-            variant={selectedThreshold === "medium" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedThreshold("medium")}
-          >
-            Medium Risk
-          </Button>
-          <Button
-            variant={selectedThreshold === "all" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedThreshold("all")}
-          >
-            All
-          </Button>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Card className="border-destructive/20 bg-destructive/5">
+            <CardHeader className="pb-2">
+              <CardDescription>Active Alerts</CardDescription>
+              <CardTitle className="flex items-center gap-2 text-2xl">
+                <BellRing className="h-5 w-5 text-destructive" />
+                {unacknowledgedCount}
+              </CardTitle>
+            </CardHeader>
+          </Card>
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader className="pb-2">
+              <CardDescription>High Risk</CardDescription>
+              <CardTitle className="flex items-center gap-2 text-2xl">
+                <ShieldAlert className="h-5 w-5 text-primary" />
+                {counts.high}
+              </CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Medium Risk</CardDescription>
+              <CardTitle className="text-2xl">{counts.medium}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Low Risk</CardDescription>
+              <CardTitle className="text-2xl">{counts.low}</CardTitle>
+            </CardHeader>
+          </Card>
         </div>
 
-        {/* Loading State */}
+        <div className="rounded-xl border bg-card p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">Filter Alerts</h2>
+              <p className="text-sm text-muted-foreground">
+                Choose a risk level or combine everything into one view.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(["high", "medium", "low", "all"] as AlertThreshold[]).map((threshold) => (
+              <Button
+                key={threshold}
+                variant={selectedThreshold === threshold ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedThreshold(threshold)}
+              >
+                {threshold === "all"
+                  ? "All Alerts"
+                  : `${threshold.charAt(0).toUpperCase()}${threshold.slice(1)} Risk`}
+              </Button>
+            ))}
+          </div>
+        </div>
+
         {isLoading && (
           <div className="flex items-center justify-center py-12">
             <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         )}
 
-        {/* Error State */}
         {error && (
-          <div className="rounded-lg border bg-card p-6 text-center">
-            <AlertCircle className="h-8 w-8 text-destructive mx-auto mb-2" />
-            <p className="text-destructive">Failed to load alerts</p>
-            <Button variant="outline" size="sm" onClick={() => mutate()} className="mt-4">
-              Retry
-            </Button>
-          </div>
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Failed to load alerts</AlertTitle>
+            <AlertDescription>
+              The alerts feed could not be loaded right now. Try refreshing the page or logging in again.
+            </AlertDescription>
+          </Alert>
         )}
 
-        {/* Empty State */}
         {!isLoading && !error && activeAlerts.length === 0 && (
-          <div className="rounded-lg border bg-card p-12 text-center">
-            <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">No Active Alerts</h2>
-            <p className="text-muted-foreground">
-              All alerts have been acknowledged or there are no students matching the selected filter.
-            </p>
-          </div>
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+              <CheckCircle className="mb-4 h-12 w-12 text-green-500" />
+              <h2 className="mb-2 text-xl font-semibold">No Active Alerts</h2>
+              <p className="max-w-xl text-muted-foreground">
+                There are no outstanding alerts for the selected filter, or every alert has already been acknowledged.
+              </p>
+            </CardContent>
+          </Card>
         )}
 
-        {/* Alert Cards Grid (Requirement 28.3) */}
         {!isLoading && !error && activeAlerts.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {activeAlerts.map((alert) => (
-              <Card key={alert.prediction_id} className="hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 
-                        className="font-semibold text-lg mb-1 cursor-pointer hover:text-primary"
+              <Card
+                key={alert.prediction_id}
+                className="border-primary/10 transition-all hover:-translate-y-0.5 hover:shadow-lg"
+              >
+                <CardHeader className="space-y-3 pb-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <button
+                        type="button"
+                        className="text-left text-lg font-semibold hover:text-primary"
                         onClick={() => router.push(`/student/${alert.student_id}`)}
                       >
                         {alert.student_name}
-                      </h3>
+                      </button>
                       <p className="text-sm text-muted-foreground">
                         {alert.course_type} • Tier {alert.institute_tier}
                       </p>
@@ -226,46 +344,73 @@ export default function AlertsPage() {
                       {alert.risk_level.toUpperCase()}
                     </Badge>
                   </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Clock3 className="h-4 w-4" />
+                    {formatTimestamp(alert.created_at)}
+                  </div>
                 </CardHeader>
-                
-                <CardContent className="space-y-3">
-                  {/* Risk Score */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Risk Score:</span>
-                    <span className="font-semibold text-lg">{alert.risk_score}</span>
+
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-lg bg-muted/50 p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Risk Score
+                      </p>
+                      <p className="mt-1 text-2xl font-bold">{alert.risk_score}</p>
+                    </div>
+                    <div className="rounded-lg bg-muted/50 p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        EMI Affordability
+                      </p>
+                      <p className="mt-1 text-2xl font-bold">
+                        {alert.emi_affordability !== null
+                          ? `${Math.round(alert.emi_affordability * 100)}%`
+                          : "N/A"}
+                      </p>
+                    </div>
                   </div>
 
-                  {/* Top Risk Driver */}
                   <div>
-                    <span className="text-sm text-muted-foreground">Top Risk Driver:</span>
-                    <p className="text-sm font-medium mt-1">
-                      {alert.top_risk_driver.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Top Risk Driver
                     </p>
+                    <p className="mt-1 font-medium">{formatDriver(alert.top_risk_driver)}</p>
                   </div>
 
-                  {/* Recommended Action */}
                   <div>
-                    <span className="text-sm text-muted-foreground">Recommended Action:</span>
-                    <p className="text-sm mt-1 text-foreground">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Recommended Action
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-foreground">
                       {getRecommendedAction(alert)}
                     </p>
                   </div>
                 </CardContent>
 
-                <CardFooter className="pt-3">
-                  {/* Acknowledge Button (Requirement 28.4) */}
+                <CardFooter className="flex gap-2 pt-3">
                   <Button
                     variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => handleAcknowledge(alert.prediction_id)}
+                    className="flex-1"
+                    onClick={() => router.push(`/student/${alert.student_id}`)}
                   >
-                    <CheckCircle className="h-4 w-4 mr-2" />
+                    <Eye className="h-4 w-4" />
+                    View Student
+                  </Button>
+                  <Button className="flex-1" onClick={() => handleAcknowledge(alert.prediction_id)}>
+                    <CheckCircle className="h-4 w-4" />
                     Acknowledge
                   </Button>
                 </CardFooter>
               </Card>
             ))}
+          </div>
+        )}
+
+        {error && (
+          <div className="flex">
+            <Button variant="outline" size="sm" onClick={() => mutate()}>
+              Retry
+            </Button>
           </div>
         )}
       </div>

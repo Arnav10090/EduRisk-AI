@@ -1,17 +1,43 @@
-FROM python:3.11-slim
+# ============================================
+# Stage 1: Builder - Install dependencies
+# ============================================
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# Install system dependencies
+# Install build dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy production requirements and install Python dependencies
+COPY requirements-production.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements-production.txt \
+    && find /install -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true \
+    && find /install -type d -name "test" -exec rm -rf {} + 2>/dev/null || true \
+    && find /install -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true \
+    && find /install -name "*.pyc" -delete \
+    && find /install -name "*.pyo" -delete \
+    && find /install -name "*.dist-info" -type d -exec rm -rf {}/RECORD {} + 2>/dev/null || true \
+    && find /install -type f -name "*.md" -delete \
+    && find /install -type f -name "*.txt" ! -name "requirements.txt" -delete
+
+# ============================================
+# Stage 2: Runtime - Minimal production image
+# ============================================
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install only runtime dependencies (no build tools)
+RUN apt-get update && apt-get install -y \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy installed packages from builder stage
+COPY --from=builder /install /usr/local
 
 # Copy wait-for-db script
 COPY docker/wait-for-db.py /app/wait-for-db.py

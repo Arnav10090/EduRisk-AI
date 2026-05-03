@@ -2,13 +2,18 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { isAuthenticated } from "@/lib/auth";
 
 export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to dashboard
-    router.push("/dashboard");
+    // Redirect to dashboard if authenticated, otherwise to login
+    if (isAuthenticated()) {
+      router.push("/dashboard");
+    } else {
+      router.push("/login");
+    }
   }, [router]);
 
   return (
@@ -19,7 +24,7 @@ export default function Home() {
           Placement Risk Intelligence Platform
         </p>
         <p className="mt-4 text-sm text-muted-foreground">
-          Redirecting to dashboard...
+          Redirecting...
         </p>
       </div>
     </main>

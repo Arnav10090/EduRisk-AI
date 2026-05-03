@@ -1,0 +1,41 @@
+{
+  "model_name": "placement_model_12m",
+  "timestamp": "2026-05-03T01:58:45.256325",
+  "demographic_parity_difference": 0.008347245409014992,
+  "equalized_odds_difference": 0.1333333333333333,
+  "metrics_by_gender": {
+    "Female": {
+      "accuracy": 0.9825436408977556,
+      "selection_rate": 1.0
+    },
+    "Male": {
+      "accuracy": 0.9732888146911519,
+      "selection_rate": 0.991652754590985
+    }
+  },
+  "metrics_by_region": {
+    "Central": {
+      "accuracy": 0.963855421686747,
+      "selection_rate": 1.0
+    },
+    "East": {
+      "accuracy": 0.9784172661870504,
+      "selection_rate": 0.9784172661870504
+    },
+    "North": {
+      "accuracy": 0.9888475836431226,
+      "selection_rate": 0.9962825278810409
+    },
+    "South": {
+      "accuracy": 0.9716981132075472,
+      "selection_rate": 1.0
+    },
+    "West": {
+      "accuracy": 0.9738219895287958,
+      "selection_rate": 0.9947643979057592
+    }
+  },
+  "bias_threshold": 0.1,
+  "is_biased": false,
+  "bias_flag": "PASSED"
+}

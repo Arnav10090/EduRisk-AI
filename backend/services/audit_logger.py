@@ -206,35 +206,44 @@ class AuditLogger:
         db: AsyncSession,
         student_id: UUID,
         prediction_id: UUID,
-        performed_by: Optional[str] = "system",
-        metadata: Optional[Dict[str, Any]] = None
+        performed_by: Optional[str] = "system"
     ) -> AuditLog:
         """
         Convenience method to log an EXPLAIN action.
         
         This method provides a type-safe interface for logging explanation
-        retrieval actions.
+        retrieval actions. Automatically includes explanation_type="SHAP" in
+        metadata for compliance tracking.
         
         Args:
             db: Async database session
             student_id: UUID of the student record
             prediction_id: UUID of the prediction record
             performed_by: User or system identifier (default: "system")
-            metadata: Optional additional metadata
             
         Returns:
             Created AuditLog ORM object
             
         Requirements:
+            - 6.1.1: Create log_explain() static method
+            - 6.1.2: Accept parameters: db, student_id, prediction_id, performed_by
+            - 6.1.3: Create AuditLog entry with action="EXPLAIN"
+            - 6.1.4: Include explanation_type="SHAP" in details
+            - 6.1.5: Record timestamp automatically (handled by database)
             - 14.2: Log EXPLAIN action when SHAP explanation is retrieved
         """
+        # Include explanation_type="SHAP" in metadata (Requirement 6.1.4)
+        metadata = {
+            "explanation_type": "SHAP"
+        }
+        
         return await AuditLogger.log_action(
             db=db,
             action="EXPLAIN",
             student_id=student_id,
             prediction_id=prediction_id,
             performed_by=performed_by,
-            metadata=metadata or {}
+            metadata=metadata
         )
     
     @staticmethod

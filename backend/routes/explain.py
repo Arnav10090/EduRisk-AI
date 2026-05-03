@@ -17,6 +17,8 @@ import logging
 from backend.db.session import get_db
 from backend.models.prediction import Prediction
 from backend.schemas.prediction import ShapExplanationResponse
+from backend.services.audit_logger import AuditLogger
+from backend.routes.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -26,26 +28,41 @@ router = APIRouter()
 @router.get("/explain/{student_id}", response_model=ShapExplanationResponse, status_code=status.HTTP_200_OK)
 async def get_explanation(
     student_id: UUID = PathParam(..., description="Student UUID"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Retrieve detailed SHAP explanation for a student's most recent prediction.
     
+    **Protected Route**: Requires valid JWT token in Authorization header.
+    
     This endpoint returns the complete SHAP values dictionary, base value,
     prediction probability, and waterfall data structure for visualization.
+    Logs the EXPLAIN action to the audit trail for compliance tracking.
     
     Args:
         student_id: UUID of the student
         db: Database session (injected)
+        current_user: Authenticated user information (injected from JWT)
         
     Returns:
         ShapExplanationResponse with SHAP values and waterfall data
         
     Raises:
+        HTTPException 401: Invalid or expired JWT token
         HTTPException 404: No prediction found for student
         HTTPException 500: Internal server error
         
     Requirements:
+        - 6.2: Log EXPLAIN action to audit trail
+        - 6.2.1: Import AuditLogger
+        - 6.2.2: Call await AuditLogger.log_explain()
+        - 6.2.3: Pass student_id, prediction_id, and performed_by="api_user"
+        - 6.2.4: Commit audit log entry to database
+        - 7.3.1: Use get_current_user() dependency for JWT authentication
+        - 7.3.2: Extract and validate JWT from Authorization header
+        - 7.3.3: Return user information from JWT payload
+        - 7.3.4: Raise 401 exception for invalid/expired tokens
         - 10.1: Accept student UUID via GET /api/explain/{student_id}
         - 10.2: Retrieve most recent prediction for student
         - 10.3: Return ShapExplanationResponse with SHAP values
@@ -54,7 +71,7 @@ async def get_explanation(
         - 10.6: Complete within 1 second
     """
     try:
-        logger.info(f"Retrieving SHAP explanation for student: {student_id}")
+        logger.info(f"User '{current_user['username']}' retrieving SHAP explanation for student: {student_id}")
         
         # Query most recent prediction for student (Requirement 10.2)
         query = (
@@ -121,6 +138,17 @@ async def get_explanation(
             f"SHAP explanation retrieved for student: {student_id} - "
             f"Prediction: {prediction_value:.4f}"
         )
+        
+        # Log EXPLAIN action to audit trail (Requirement 6.2)
+        await AuditLogger.log_explain(
+            db=db,
+            student_id=student_id,
+            prediction_id=prediction.id,
+            performed_by=current_user['username']  # Use authenticated username
+        )
+        
+        # Commit audit log entry to database (Requirement 6.2.4)
+        await db.commit()
         
         return ShapExplanationResponse(
             student_id=student_id,

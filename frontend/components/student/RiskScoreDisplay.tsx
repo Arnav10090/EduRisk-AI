@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, CheckCircle, AlertCircle } from "lucide-react";
+import { RiskScoreGauge } from "./RiskScoreGauge";
 
 interface RiskScoreDisplayProps {
   riskScore: number;
@@ -59,27 +60,23 @@ export function RiskScoreDisplay({
   return (
     <Card className={`${colors.border} border-2`}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Risk Score</CardTitle>
+        <CardTitle className="text-sm font-medium">Risk Assessment</CardTitle>
         <Icon className={`h-5 w-5 ${colors.text}`} />
       </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-between">
-          <div>
-            <div className={`text-5xl font-bold ${colors.text}`}>
-              {riskScore}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">out of 100</p>
-          </div>
-          <div className="flex flex-col items-end gap-2">
-            <Badge className={colors.badge}>
-              {riskLevel.toUpperCase()}
+      <CardContent className="flex flex-col items-center space-y-4">
+        {/* Circular gauge visualization */}
+        <RiskScoreGauge riskScore={riskScore} size={200} />
+        
+        {/* Risk level badge */}
+        <div className="flex flex-col items-center gap-2">
+          <Badge className={colors.badge}>
+            {riskLevel.toUpperCase()} RISK
+          </Badge>
+          {alertTriggered && (
+            <Badge variant="destructive" className="text-xs">
+              ALERT
             </Badge>
-            {alertTriggered && (
-              <Badge variant="destructive" className="text-xs">
-                ALERT
-              </Badge>
-            )}
-          </div>
+          )}
         </div>
       </CardContent>
     </Card>

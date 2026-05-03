@@ -37,14 +37,21 @@ def configure_cors(app, cors_origins: list):
         app: FastAPI application instance
         cors_origins: List of allowed origins
         
-    Requirements: 21.1, 21.2, 21.5
+    Requirements: 21.1, 21.2, 21.5, 22.1, 22.2, 22.3, 22.4
     """
+    # Log warning if wildcard detected
+    if "*" in cors_origins:
+        logger.warning(
+            "⚠️ SECURITY WARNING: CORS configured with wildcard (*). "
+            "This allows requests from ANY origin and should NEVER be used in production!"
+        )
+    
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization", "Accept"],
+        allow_headers=["Content-Type", "Authorization", "Accept", "X-API-Key"],
     )
     logger.info(f"CORS configured with origins: {cors_origins}")
 
@@ -104,10 +111,12 @@ def include_routes(app):
         app: FastAPI application instance
     """
     # Import route modules
-    from backend.routes import predict, explain, alerts, students, health
+    from backend.routes import predict, explain, alerts, students, health, auth, predictions
     
     # Include routers
+    api_router.include_router(auth.router, tags=["Authentication"])
     api_router.include_router(predict.router, tags=["Predictions"])
+    api_router.include_router(predictions.router, tags=["Predictions"])  # SHAP retrieval endpoint
     api_router.include_router(explain.router, tags=["Explanations"])
     api_router.include_router(alerts.router, tags=["Alerts"])
     api_router.include_router(students.router, tags=["Students"])

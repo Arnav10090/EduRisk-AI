@@ -5,11 +5,16 @@ This module transforms raw student data into model-ready feature vectors.
 All transformations are consistent between training and inference.
 
 Feature: edurisk-ai-placement-intelligence
-Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.7
+Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.7, 28
 """
 
 from typing import Dict, List, Optional
 import numpy as np
+import json
+import logging
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class FeatureEngineer:
@@ -25,69 +30,146 @@ class FeatureEngineer:
     - Placement momentum calculation
     - One-hot encoding for institute tier
     - Label encoding for course type
+    
+    Configuration is loaded from ml/pipeline/config.json (Requirement 28).
     """
     
-    # Employer type to score mapping (Requirement 17.3)
-    EMPLOYER_TYPE_SCORES = {
-        'MNC': 4,
-        'Startup': 3,
-        'PSU': 2,
-        'NGO': 1,
-        'None': 0,
-        None: 0
-    }
+    # Default config path
+    DEFAULT_CONFIG_PATH = Path(__file__).parent / "config.json"
     
-    # Course type to label encoding
-    COURSE_TYPE_ENCODING = {
-        'Engineering': 0,
-        'MBA': 1,
-        'MCA': 2,
-        'MSc': 3,
-        'Other': 4
-    }
-    
-    # Default values for historical/external data
-    # These would typically come from a feature config file or database
-    DEFAULT_PLACEMENT_RATE_3M = 0.45
-    DEFAULT_PLACEMENT_RATE_6M = 0.65
-    DEFAULT_PLACEMENT_RATE_12M = 0.80
-    DEFAULT_SALARY_BENCHMARK = 5.0  # LPA
-    DEFAULT_JOB_DEMAND_SCORE = 5.0  # 1-10 scale
-    DEFAULT_REGION_JOB_DENSITY = 0.5  # 0-1 scale
-    DEFAULT_MACRO_HIRING_INDEX = 0.6  # 0-1 scale
-    
-    def __init__(self, feature_config: Optional[Dict] = None):
+    def __init__(self, feature_config: Optional[Dict] = None, config_path: Optional[Path] = None):
         """
-        Initialize FeatureEngineer with optional configuration.
+        Initialize FeatureEngineer with configuration from JSON file.
         
         Args:
-            feature_config: Optional dictionary with historical/external data
-                           for placement rates, salary benchmarks, etc.
-        """
-        self.feature_config = feature_config or {}
+            feature_config: Optional dictionary with runtime overrides
+            config_path: Optional path to config.json file (defaults to ml/pipeline/config.json)
         
-        # Extract configuration values with defaults
-        self.placement_rate_3m = self.feature_config.get(
-            'placement_rate_3m', self.DEFAULT_PLACEMENT_RATE_3M
-        )
-        self.placement_rate_6m = self.feature_config.get(
-            'placement_rate_6m', self.DEFAULT_PLACEMENT_RATE_6M
-        )
-        self.placement_rate_12m = self.feature_config.get(
-            'placement_rate_12m', self.DEFAULT_PLACEMENT_RATE_12M
-        )
-        self.salary_benchmark = self.feature_config.get(
-            'salary_benchmark', self.DEFAULT_SALARY_BENCHMARK
-        )
-        self.job_demand_score = self.feature_config.get(
-            'job_demand_score', self.DEFAULT_JOB_DEMAND_SCORE
-        )
-        self.region_job_density = self.feature_config.get(
-            'region_job_density', self.DEFAULT_REGION_JOB_DENSITY
-        )
-        self.macro_hiring_index = self.feature_config.get(
-            'macro_hiring_index', self.DEFAULT_MACRO_HIRING_INDEX
-        )
+        Requirements: 28.1, 28.2, 28.3, 28.4, 28.5, 28.6
+        """
+        # Load configuration from file (Requirement 28.1)
+        config_file = config_path or self.DEFAULT_CONFIG_PATH
+        self.config = self._load_config(config_file)
+        
+        # Apply runtime overrides if provided
+        if feature_config:
+            self.config.update(feature_config)
+        
+        # Extract internship score weights (Requirement 28.2)
+        internship_weights = self.config.get('internship_score_weights', {})
+        self.internship_count_weight = internship_weights.get('count_weight', 0.4)
+        self.internship_months_weight = internship_weights.get('months_weight', 0.3)
+        self.internship_employer_weight = internship_weights.get('employer_weight', 0.3)
+        self.internship_months_denominator = internship_weights.get('months_denominator', 24.0)
+        
+        # Extract skill gap weights (Requirement 28.2)
+        skill_gap_weights = self.config.get('skill_gap_weights', {})
+        self.skill_gap_cgpa_multiplier = skill_gap_weights.get('cgpa_multiplier', 5.0)
+        self.skill_gap_internship_multiplier = skill_gap_weights.get('internship_multiplier', 5.0)
+        
+        # Extract certification cap (Requirement 28.2)
+        cert_config = self.config.get('certification_cap', {})
+        self.max_certifications = cert_config.get('max_certifications', 5)
+        
+        # Extract historical defaults (Requirement 28.2)
+        historical = self.config.get('historical_defaults', {})
+        self.placement_rate_3m = historical.get('placement_rate_3m', 0.45)
+        self.placement_rate_6m = historical.get('placement_rate_6m', 0.65)
+        self.placement_rate_12m = historical.get('placement_rate_12m', 0.80)
+        self.salary_benchmark = historical.get('salary_benchmark', 5.0)
+        self.job_demand_score = historical.get('job_demand_score', 5.0)
+        self.region_job_density = historical.get('region_job_density', 0.5)
+        self.macro_hiring_index = historical.get('macro_hiring_index', 0.6)
+        
+        # Extract employer type scores (Requirement 28.2)
+        self.EMPLOYER_TYPE_SCORES = self.config.get('employer_type_scores', {
+            'MNC': 4, 'Startup': 3, 'PSU': 2, 'NGO': 1, 'None': 0, None: 0
+        })
+        
+        # Extract course type encoding (Requirement 28.2)
+        self.COURSE_TYPE_ENCODING = self.config.get('course_type_encoding', {
+            'Engineering': 0, 'MBA': 1, 'MCA': 2, 'MSc': 3, 'Other': 4
+        })
+        
+        # Log loaded configuration (Requirement 28.6)
+        logger.info(f"FeatureEngineer initialized with config from: {config_file}")
+        logger.info(f"Internship weights: count={self.internship_count_weight}, "
+                   f"months={self.internship_months_weight}, employer={self.internship_employer_weight}")
+        logger.info(f"Skill gap multipliers: cgpa={self.skill_gap_cgpa_multiplier}, "
+                   f"internship={self.skill_gap_internship_multiplier}")
+        logger.info(f"Historical defaults: placement_3m={self.placement_rate_3m}, "
+                   f"placement_6m={self.placement_rate_6m}, salary={self.salary_benchmark}")
+    
+    def _load_config(self, config_path: Path) -> Dict:
+        """
+        Load configuration from JSON file with fallback to defaults.
+        
+        Args:
+            config_path: Path to config.json file
+            
+        Returns:
+            Configuration dictionary
+            
+        Requirements: 28.1, 28.4, 28.5
+        """
+        try:
+            if config_path.exists():
+                with open(config_path, 'r') as f:
+                    config = json.load(f)
+                logger.info(f"✅ Loaded feature engineering config from {config_path}")
+                return config
+            else:
+                # Config file missing, use defaults (Requirement 28.4)
+                logger.warning(f"⚠️ Config file not found at {config_path}, using default weights")
+                return self._get_default_config()
+        except json.JSONDecodeError as e:
+            # Invalid JSON, use defaults (Requirement 28.4)
+            logger.warning(f"⚠️ Invalid JSON in config file {config_path}: {e}, using default weights")
+            return self._get_default_config()
+        except Exception as e:
+            # Other errors, use defaults (Requirement 28.4)
+            logger.warning(f"⚠️ Error loading config from {config_path}: {e}, using default weights")
+            return self._get_default_config()
+    
+    def _get_default_config(self) -> Dict:
+        """
+        Return default configuration when config.json is missing or invalid.
+        
+        Returns:
+            Default configuration dictionary
+            
+        Requirement: 28.4
+        """
+        return {
+            'internship_score_weights': {
+                'count_weight': 0.4,
+                'months_weight': 0.3,
+                'employer_weight': 0.3,
+                'months_denominator': 24.0
+            },
+            'skill_gap_weights': {
+                'cgpa_multiplier': 5.0,
+                'internship_multiplier': 5.0
+            },
+            'certification_cap': {
+                'max_certifications': 5
+            },
+            'historical_defaults': {
+                'placement_rate_3m': 0.45,
+                'placement_rate_6m': 0.65,
+                'placement_rate_12m': 0.80,
+                'salary_benchmark': 5.0,
+                'job_demand_score': 5.0,
+                'region_job_density': 0.5,
+                'macro_hiring_index': 0.6
+            },
+            'employer_type_scores': {
+                'MNC': 4, 'Startup': 3, 'PSU': 2, 'NGO': 1, 'None': 0, None: 0
+            },
+            'course_type_encoding': {
+                'Engineering': 0, 'MBA': 1, 'MCA': 2, 'MSc': 3, 'Other': 4
+            }
+        }
     
     def transform(self, student_data: Dict) -> np.ndarray:
         """
@@ -145,8 +227,8 @@ class FeatureEngineer:
         # Feature 3: Employer Type Score (Requirement 17.3)
         employer_type_score = self._get_employer_type_score(internship_employer_type)
         
-        # Feature 4: Certifications (capped at 5)
-        certifications_capped = min(certifications, 5)
+        # Feature 4: Certifications (capped at max from config - Requirement 28.3)
+        certifications_capped = min(certifications, self.max_certifications)
         
         # Features 5-7: Institute Tier One-Hot Encoding (Requirement 17.7)
         institute_tier_1 = 1.0 if institute_tier == 1 else 0.0
@@ -214,10 +296,12 @@ class FeatureEngineer:
         internship_employer_type: str
     ) -> float:
         """
-        Compute internship score using weighted formula.
+        Compute internship score using weighted formula from config.
         
-        Formula (Requirement 17.2):
-        internship_score = (count × 0.4) + (months/24 × 0.3) + (employer_score × 0.3)
+        Formula (Requirement 17.2, 28.2, 28.3):
+        internship_score = (count × count_weight) + (months/months_denominator × months_weight) + (employer_score × employer_weight)
+        
+        Weights are loaded from config.json, not hardcoded.
         
         Args:
             internship_count: Number of internships
@@ -227,10 +311,10 @@ class FeatureEngineer:
         Returns:
             Internship score as float
         """
-        count_component = internship_count * 0.4
-        months_component = (internship_months / 24.0) * 0.3
+        count_component = internship_count * self.internship_count_weight
+        months_component = (internship_months / self.internship_months_denominator) * self.internship_months_weight
         employer_score = self._get_employer_type_score(internship_employer_type)
-        employer_component = employer_score * 0.3
+        employer_component = employer_score * self.internship_employer_weight
         
         return count_component + months_component + employer_component
     
@@ -280,10 +364,12 @@ class FeatureEngineer:
         internship_score: float
     ) -> float:
         """
-        Compute skill gap score.
+        Compute skill gap score using weights from config.
         
-        Formula (Requirement 17.4):
-        skill_gap_score = job_demand_score - (cgpa_normalized × 5 + internship_score × 5)
+        Formula (Requirement 17.4, 28.2, 28.3):
+        skill_gap_score = job_demand_score - (cgpa_normalized × cgpa_multiplier + internship_score × internship_multiplier)
+        
+        Multipliers are loaded from config.json, not hardcoded.
         
         Args:
             job_demand_score: Job demand index (1-10)
@@ -293,7 +379,8 @@ class FeatureEngineer:
         Returns:
             Skill gap score
         """
-        return job_demand_score - (cgpa_normalized * 5 + internship_score * 5)
+        return job_demand_score - (cgpa_normalized * self.skill_gap_cgpa_multiplier + 
+                                   internship_score * self.skill_gap_internship_multiplier)
     
     def _compute_emi_stress_ratio(
         self,

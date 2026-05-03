@@ -236,7 +236,7 @@ class PlacementModelTrainer:
             # Save model
             model_path = self.model_dir / f'{model_name}.pkl'
             joblib.dump(model, model_path)
-            print(f'\n✓ Model saved to {model_path}')
+            print(f'\n[OK] Model saved to {model_path}')
             
             # Store metrics
             all_metrics[window] = metrics
@@ -269,7 +269,7 @@ class PlacementModelTrainer:
         with open(output_path, 'w') as f:
             json.dump(metrics_serializable, f, indent=2)
         
-        print(f'\n✓ Metrics saved to {output_path}')
+        print(f'\n[OK] Metrics saved to {output_path}')
 
 
 def main():
@@ -295,7 +295,7 @@ def main():
     trainer.save_metrics()
     
     print('\n' + '=' * 60)
-    print('✓ Training complete!')
+    print('[OK] Training complete!')
     print('=' * 60)
     print('\nSummary:')
     for window, m in metrics.items():
