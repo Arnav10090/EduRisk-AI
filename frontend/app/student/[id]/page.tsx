@@ -204,15 +204,15 @@ export default function StudentDetailPage() {
                 alertTriggered={student.alert_triggered!}
               />
               <PlacementProbChart
-                prob3m={student.prob_placed_3m!}
-                prob6m={student.prob_placed_6m!}
-                prob12m={student.prob_placed_12m!}
+                prob3m={student.prob_placed_3m}
+                prob6m={student.prob_placed_6m}
+                prob12m={student.prob_placed_12m}
               />
               <SalaryRangeCard
-                salaryMin={student.salary_min!}
-                salaryMax={student.salary_max!}
-                salaryConfidence={student.salary_confidence!}
-                emiAffordability={student.emi_affordability ?? undefined}
+                salaryMin={student.salary_min}
+                salaryMax={student.salary_max}
+                salaryConfidence={student.salary_confidence}
+                emiAffordability={student.emi_affordability}
               />
             </div>
 

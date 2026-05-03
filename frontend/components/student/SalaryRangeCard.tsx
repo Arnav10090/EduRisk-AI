@@ -6,10 +6,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { TrendingUp, Info } from "lucide-react";
 
 interface SalaryRangeCardProps {
-  salaryMin: number;
-  salaryMax: number;
-  salaryConfidence: number;
-  emiAffordability?: number;
+  salaryMin?: number | null;
+  salaryMax?: number | null;
+  salaryConfidence?: number | null;
+  emiAffordability?: number | null;
 }
 
 export function SalaryRangeCard({
@@ -18,9 +18,12 @@ export function SalaryRangeCard({
   salaryConfidence,
   emiAffordability,
 }: SalaryRangeCardProps) {
+  const isFiniteNumber = (value: number | null | undefined): value is number =>
+    typeof value === "number" && Number.isFinite(value);
+
   // Format salary values in LPA (Requirement 26.3)
-  const formatSalary = (value: number) => {
-    return value.toFixed(2);
+  const formatSalary = (value: number | null | undefined) => {
+    return isFiniteNumber(value) ? value.toFixed(2) : "N/A";
   };
 
   // Determine EMI affordability status (Requirement 11)
@@ -46,12 +49,18 @@ export function SalaryRangeCard({
     }
   };
 
-  const affordabilityPct = emiAffordability !== undefined && emiAffordability !== null 
+  const affordabilityPct = isFiniteNumber(emiAffordability)
     ? (emiAffordability * 100).toFixed(1) 
     : null;
-  const affordabilityStatus = emiAffordability !== undefined && emiAffordability !== null 
+  const affordabilityStatus = isFiniteNumber(emiAffordability)
     ? getAffordabilityStatus(emiAffordability) 
     : null;
+  const confidencePct = isFiniteNumber(salaryConfidence)
+    ? `${salaryConfidence.toFixed(0)}%`
+    : "N/A";
+  const confidenceWidth = isFiniteNumber(salaryConfidence)
+    ? `${Math.min(Math.max(salaryConfidence, 0), 100)}%`
+    : "0%";
 
   return (
     <Card>
@@ -80,13 +89,13 @@ export function SalaryRangeCard({
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">Confidence</p>
               <p className="text-sm font-semibold">
-                {salaryConfidence.toFixed(0)}%
+                {confidencePct}
               </p>
             </div>
             <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
               <div
                 className="h-full bg-[#3B82F6] rounded-full transition-all"
-                style={{ width: `${Math.min(salaryConfidence, 100)}%` }}
+                style={{ width: confidenceWidth }}
               />
             </div>
           </div>

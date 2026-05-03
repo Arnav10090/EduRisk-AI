@@ -4,7 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 interface RiskDriver {
   feature: string;
-  value: number;
+  value: number | null;
   direction: string;
 }
 
@@ -25,8 +25,10 @@ export function ShapWaterfallChart({ drivers }: ShapWaterfallChartProps) {
   // Prepare data for horizontal bar chart (Requirement 26.4)
   const chartData = drivers.map((driver) => ({
     feature: formatFeatureName(driver.feature),
-    value: driver.value,
-    absValue: Math.abs(driver.value),
+    value: typeof driver.value === "number" && Number.isFinite(driver.value) ? driver.value : 0,
+    absValue: typeof driver.value === "number" && Number.isFinite(driver.value)
+      ? Math.abs(driver.value)
+      : 0,
     direction: driver.direction,
   }));
 
@@ -38,7 +40,7 @@ export function ShapWaterfallChart({ drivers }: ShapWaterfallChartProps) {
         <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
           <p className="font-semibold text-sm">{data.feature}</p>
           <p className={`text-sm ${data.direction === "positive" ? "text-[#1D9E75]" : "text-[#E24B4A]"}`}>
-            SHAP Value: {data.value.toFixed(4)}
+            SHAP Value: {Number.isFinite(data.value) ? data.value.toFixed(4) : "N/A"}
           </p>
           <p className="text-xs text-muted-foreground">
             {data.direction === "positive" ? "Increases" : "Decreases"} risk

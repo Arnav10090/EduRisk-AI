@@ -4,9 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 interface PlacementProbChartProps {
-  prob3m: number;
-  prob6m: number;
-  prob12m: number;
+  prob3m?: number | null;
+  prob6m?: number | null;
+  prob12m?: number | null;
 }
 
 export function PlacementProbChart({
@@ -14,21 +14,26 @@ export function PlacementProbChart({
   prob6m,
   prob12m,
 }: PlacementProbChartProps) {
+  const toPercentage = (value: number | null | undefined) =>
+    typeof value === "number" && Number.isFinite(value)
+      ? Number((value * 100).toFixed(1))
+      : 0;
+
   // Format data for Recharts (Requirement 26.2)
   const data = [
     {
       name: "3 Months",
-      probability: Number((prob3m * 100).toFixed(1)),
+      probability: toPercentage(prob3m),
       fill: "#1D9E75",
     },
     {
       name: "6 Months",
-      probability: Number((prob6m * 100).toFixed(1)),
+      probability: toPercentage(prob6m),
       fill: "#3B82F6",
     },
     {
       name: "12 Months",
-      probability: Number((prob12m * 100).toFixed(1)),
+      probability: toPercentage(prob12m),
       fill: "#8B5CF6",
     },
   ];
