@@ -143,6 +143,11 @@ class PredictionResponse(BaseModel):
         ...,
         description="Unique identifier for the student"
     )
+
+    name: str = Field(
+        ...,
+        description="Student full name"
+    )
     
     prediction_id: UUID = Field(
         ...,

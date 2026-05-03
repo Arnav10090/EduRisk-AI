@@ -1,6 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { apiClient } from "@/lib/auth";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
@@ -16,8 +17,6 @@ interface PredictionHistory {
   created_at: string;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 export function RiskTrendChart({ studentId }: RiskTrendChartProps) {
   const [predictions, setPredictions] = useState<PredictionHistory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,9 +31,7 @@ export function RiskTrendChart({ studentId }: RiskTrendChartProps) {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/students/${studentId}/predictions`
-      );
+      const response = await apiClient(`/api/students/${studentId}/predictions`);
 
       if (!response.ok) {
         throw new Error("Failed to fetch prediction history");

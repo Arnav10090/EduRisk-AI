@@ -18,9 +18,9 @@ interface NavigationLink {
 
 const navigationLinks: NavigationLink[] = [
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/alerts", label: "Alerts" },
   { href: "/student/new", label: "New Student" },
   { href: "/student/batch", label: "Batch Upload" },
+  { href: "/alerts", label: "Alerts" },
 ];
 
 export function NavigationBar() {
@@ -38,7 +38,7 @@ export function NavigationBar() {
 
     const fetchAlertCount = async () => {
       try {
-        const response = await apiClient("/api/alerts?threshold=high&limit=1000");
+        const response = await apiClient("/api/alerts?threshold=high&limit=500");
         if (response.ok) {
           const alerts = await response.json();
           setHighRiskCount(Array.isArray(alerts) ? alerts.length : 0);

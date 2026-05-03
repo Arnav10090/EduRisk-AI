@@ -234,6 +234,7 @@ class PredictionService:
         # Step 14: Return complete response (Requirement 8.5)
         return self._build_response(
             student_id=student.id,
+            student_name=student.name,
             prediction_id=prediction.id,
             placement_pred=placement_pred,
             salary_pred=salary_pred,
@@ -462,6 +463,7 @@ class PredictionService:
     def _build_response(
         self,
         student_id: UUID,
+        student_name: str,
         prediction_id: UUID,
         placement_pred,
         salary_pred,
@@ -517,6 +519,7 @@ class PredictionService:
         
         return PredictionResponse(
             student_id=student_id,
+            name=student_name,
             prediction_id=prediction_id,
             prob_placed_3m=Decimal(str(placement_pred.prob_3m)),
             prob_placed_6m=Decimal(str(placement_pred.prob_6m)),

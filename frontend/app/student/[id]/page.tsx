@@ -3,6 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { apiClient } from "@/lib/auth";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import { RiskScoreDisplay } from "@/components/student/RiskScoreDisplay";
 import { PlacementProbChart } from "@/components/student/PlacementProbChart";
@@ -58,8 +59,6 @@ interface AuditEntry {
   created_at: string;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 export default function StudentDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -75,9 +74,7 @@ export default function StudentDetailPage() {
       setError(null);
       
       // Fetch student detail with latest prediction
-      const studentResponse = await fetch(
-        `${API_BASE_URL}/api/students/${studentId}`
-      );
+      const studentResponse = await apiClient(`/api/students/${studentId}`);
       
       if (!studentResponse.ok) {
         if (studentResponse.status === 404) {
@@ -87,12 +84,31 @@ export default function StudentDetailPage() {
       }
       
       const studentData: StudentDetail = await studentResponse.json();
+      
+      // Convert Decimal strings from backend to numbers
+      // (Pydantic serializes Python Decimal as strings in JSON)
+      const numericFields = [
+        'risk_score', 'prob_placed_3m', 'prob_placed_6m', 'prob_placed_12m',
+        'salary_min', 'salary_max', 'salary_confidence', 'emi_affordability'
+      ] as const;
+      for (const field of numericFields) {
+        if (studentData[field] !== null && studentData[field] !== undefined) {
+          (studentData as any)[field] = Number(studentData[field]);
+        }
+      }
+      
+      // Also convert SHAP driver values if present
+      if (studentData.top_risk_drivers) {
+        studentData.top_risk_drivers = studentData.top_risk_drivers.map(driver => ({
+          ...driver,
+          value: Number(driver.value),
+        }));
+      }
+      
       setStudent(studentData);
       
       // Fetch audit trail (all predictions for this student)
-      const auditResponse = await fetch(
-        `${API_BASE_URL}/api/students/${studentId}/predictions`
-      );
+      const auditResponse = await apiClient(`/api/students/${studentId}/predictions`);
       
       if (auditResponse.ok) {
         const auditData: AuditEntry[] = await auditResponse.json();

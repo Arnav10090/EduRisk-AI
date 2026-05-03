@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { apiClient } from "@/lib/auth";
 import {
   Select,
   SelectContent,
@@ -15,8 +16,13 @@ import {
 } from "@/components/ui/select";
 import { ArrowLeft, ArrowRight, CheckCircle, Loader2 } from "lucide-react";
 import { z } from "zod";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const FORM_DRAFT_STORAGE_KEY = "edurisk_new_student_form_draft";
+const DEFAULT_FORM_DATA: Partial<StudentFormData> = {
+  cgpa_scale: 10.0,
+  internship_count: 0,
+  internship_months: 0,
+  certifications: 0,
+};
 
 // Base schema object without refinements
 const baseStudentSchema = z.object({
@@ -136,15 +142,50 @@ export default function NewPredictionPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Form data
-  const [formData, setFormData] = useState<Partial<StudentFormData>>({
-    cgpa_scale: 10.0,
-    internship_count: 0,
-    internship_months: 0,
-    certifications: 0,
-  });
+  const [formData, setFormData] = useState<Partial<StudentFormData>>(DEFAULT_FORM_DATA);
 
   // Validation errors
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const savedDraft = window.localStorage.getItem(FORM_DRAFT_STORAGE_KEY);
+    if (!savedDraft) {
+      return;
+    }
+
+    try {
+      const parsedDraft = JSON.parse(savedDraft) as {
+        currentStep?: number;
+        formData?: Partial<StudentFormData>;
+      };
+
+      setFormData({
+        ...DEFAULT_FORM_DATA,
+        ...(parsedDraft.formData ?? {}),
+      });
+
+      if (
+        typeof parsedDraft.currentStep === "number" &&
+        parsedDraft.currentStep >= 1 &&
+        parsedDraft.currentStep <= 3
+      ) {
+        setCurrentStep(parsedDraft.currentStep);
+      }
+    } catch (error) {
+      console.error("Failed to restore Add Student draft:", error);
+      window.localStorage.removeItem(FORM_DRAFT_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      FORM_DRAFT_STORAGE_KEY,
+      JSON.stringify({
+        currentStep,
+        formData,
+      })
+    );
+  }, [currentStep, formData]);
 
   const updateField = (field: keyof StudentFormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -208,11 +249,8 @@ export default function NewPredictionPage() {
       setSubmitError(null);
 
       // POST to /api/predict
-      const response = await fetch(`${API_BASE_URL}/api/predict`, {
+      const response = await apiClient("/api/predict", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(validatedData),
       });
 
@@ -227,6 +265,7 @@ export default function NewPredictionPage() {
       
       // Navigate to student detail page
       if (result.student_id) {
+        window.localStorage.removeItem(FORM_DRAFT_STORAGE_KEY);
         router.push(`/student/${result.student_id}`);
       } else {
         throw new Error("No student ID returned from API");
@@ -262,11 +301,15 @@ export default function NewPredictionPage() {
 
         {/* Progress Indicator */}
         <div className="mb-8">
-          <div className="flex items-center justify-between">
-            {[1, 2, 3].map((step) => (
-              <div key={step} className="flex items-center flex-1">
+          <div className="flex items-start justify-between">
+            {[
+              { step: 1, label: "Academic Info" },
+              { step: 2, label: "Internship & Skills" },
+              { step: 3, label: "Loan Details" },
+            ].map(({ step, label }) => (
+              <div key={step} className="relative flex flex-col items-center">
                 <div
-                  className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
+                  className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${
                     currentStep >= step
                       ? "border-primary bg-primary text-primary-foreground"
                       : "border-muted bg-background text-muted-foreground"
@@ -278,20 +321,16 @@ export default function NewPredictionPage() {
                     <span className="font-semibold">{step}</span>
                   )}
                 </div>
+                <span className="mt-2 text-center text-sm font-medium">{label}</span>
                 {step < 3 && (
                   <div
-                    className={`flex-1 h-1 mx-2 ${
+                    className={`absolute left-full top-5 hidden h-1 w-[calc(100vw/6)] -translate-y-1/2 md:block max-w-52 ${
                       currentStep > step ? "bg-primary" : "bg-muted"
                     }`}
                   />
                 )}
               </div>
             ))}
-          </div>
-          <div className="flex justify-between mt-2">
-            <span className="text-sm font-medium">Academic Info</span>
-            <span className="text-sm font-medium">Internship & Skills</span>
-            <span className="text-sm font-medium">Loan Details</span>
           </div>
         </div>
 

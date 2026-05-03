@@ -5,10 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert } from "@/components/ui/alert";
+import { apiClient } from "@/lib/auth";
 import { Upload, FileText, CheckCircle, XCircle, Loader2, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 interface ParsedStudent {
   name: string;
@@ -36,7 +35,8 @@ interface ValidationError {
 
 interface BatchResult {
   student_id: string;
-  name: string;
+  name?: string;
+  student_name?: string;
   risk_level: string;
   risk_score: number;
   prediction_id: string;
@@ -269,11 +269,8 @@ export function BatchUpload() {
     setSubmitError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/batch-score`, {
+      const response = await apiClient("/api/batch-score", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           students: parsedStudents,
         }),
@@ -287,7 +284,19 @@ export function BatchUpload() {
       }
 
       const result: BatchResponse = await response.json();
-      setBatchResults(result);
+      const resultsWithNames = result.results.map((batchResult, index) => ({
+        ...batchResult,
+        name:
+          batchResult.name ||
+          batchResult.student_name ||
+          parsedStudents[index]?.name ||
+          "Unknown Student",
+      }));
+
+      setBatchResults({
+        ...result,
+        results: resultsWithNames,
+      });
     } catch (error) {
       console.error("Error submitting batch:", error);
       setSubmitError(
@@ -505,7 +514,9 @@ export function BatchUpload() {
                 <TableBody>
                   {batchResults.results.slice(0, 20).map((result, idx) => (
                     <TableRow key={idx}>
-                      <TableCell className="font-medium">{result.name}</TableCell>
+                      <TableCell className="font-medium">
+                        {result.name || result.student_name || "Unknown Student"}
+                      </TableCell>
                       <TableCell>
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
