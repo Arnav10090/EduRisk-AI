@@ -50,17 +50,19 @@ class LoginRequest(BaseModel):
 
 
 # Mock user database (for MVP - replace with real database in production)
-# In production, this should query the users table in PostgreSQL
+# These seeded accounts are intentional hackathon/demo credentials so judges
+# can access the product immediately without a signup flow.
+# In production, this should query the users table in PostgreSQL.
 MOCK_USERS = {
     "admin": {
         "username": "admin",
-        "hashed_password": get_password_hash("admin123"),  # Default password: admin123
+        "hashed_password": get_password_hash("admin123"),  # Demo password: admin123
         "email": "admin@edurisk.ai",
         "full_name": "Admin User"
     },
     "demo": {
         "username": "demo",
-        "hashed_password": get_password_hash("demo@1234"),  # Default password: demo@1234
+        "hashed_password": get_password_hash("demo@1234"),  # Demo password: demo@1234
         "email": "demo@edurisk.ai",
         "full_name": "Demo User"
     }

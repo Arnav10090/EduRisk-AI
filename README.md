@@ -15,7 +15,7 @@ EduRisk AI predicts student placement outcomes and generates actionable risk ass
 - **Salary Range Estimates**: Expected starting salary with confidence intervals
 - **Risk Scoring**: Composite risk scores (0-100) with categorical levels (Low/Medium/High)
 - **SHAP Explainability**: Transparent feature attributions for every prediction
-- **AI-Generated Summaries**: Natural language risk explanations via Claude API
+- **AI-Generated Summaries**: Optional natural language risk explanations via Groq or Anthropic
 - **Actionable Recommendations**: Personalized intervention suggestions
 - **Compliance Audit Trails**: Complete logging for RBI regulatory requirements
 
@@ -55,7 +55,7 @@ EduRisk AI predicts student placement outcomes and generates actionable risk ass
 | Database | PostgreSQL | 16 |
 | ORM | SQLAlchemy | 2.0.30 |
 | Cache | Redis | 7 |
-| LLM | Groq API (Llama 3.1) / Anthropic Claude | Latest |
+| LLM | Optional Groq / Anthropic integration | Latest |
 | Frontend | Next.js | 14 |
 | UI Components | shadcn/ui + Tailwind CSS | Latest |
 | Containerization | Docker + Docker Compose | Latest |
@@ -68,6 +68,17 @@ EduRisk AI predicts student placement outcomes and generates actionable risk ass
 - **LLM API Key** (optional - for AI summaries, system works without it)
 - **8GB RAM** minimum
 - **10GB disk space** for Docker images and data
+
+### Quick Demo Access
+
+After the stack starts:
+
+- **Frontend**: http://localhost:3000
+- **API Docs**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/api/health
+- **Demo login**: `demo` / `demo@1234`
+- **Admin login**: `admin` / `admin123`
+- These are intentional seeded demo credentials for hackathon evaluation only.
 
 ### Installation
 
@@ -84,38 +95,32 @@ EduRisk AI predicts student placement outcomes and generates actionable risk ass
    
    Edit `.env` and configure:
    ```env
-   # LLM API Configuration (Optional - system works without it)
-   # Option 1: Groq API (Recommended - Free tier available, fast inference)
-   LLM_API_KEY=your_groq_api_key_here
-   LLM_PROVIDER=groq
+   # Security
+   SECRET_KEY=your_secret_key_here_change_in_production
    
-   # Option 2: Anthropic Claude API (Alternative, higher quality)
-   # LLM_API_KEY=sk-ant-api03-your-key-here
+   # Leave API_KEY empty for the frontend demo flow.
+   # If you set it, manual API requests must include X-API-Key.
+   API_KEY=
+   
+   # Optional LLM integration
+   # LLM_API_KEY=your_provider_key_here
    # LLM_PROVIDER=anthropic
    
-   # Security (Required)
-   SECRET_KEY=your_secret_key_here_change_in_production
-   API_KEY=your_api_key_here_change_in_production
-   
-   # Application Settings
+   # Application settings
    DEBUG=False  # Set to True only for local development
    LOG_LEVEL=INFO
    
-   # Database Configuration (optional - defaults are set in docker-compose.yml)
-   # POSTGRES_USER=edurisk
-   # POSTGRES_PASSWORD=edurisk_password
-   # POSTGRES_DB=edurisk_db
+   # Docker defaults
+   POSTGRES_USER=edurisk
+   POSTGRES_PASSWORD=edurisk_password
+   POSTGRES_DB=edurisk_db
    ```
    
-   **Note**: The LLM integration is optional. If `LLM_API_KEY` is not configured, the system will gracefully degrade and provide predictions without AI-generated summaries.
+   Notes:
+   - The LLM integration is optional. If `LLM_API_KEY` is not configured, the system still serves predictions, risk scores, and SHAP explanations.
+   - This repo currently does not include the trained `.pkl` model binaries. On first backend startup, the container auto-trains models if they are missing. That can add 1-2 minutes to first boot.
 
-3. **Validate setup**
-   ```bash
-   chmod +x docker/validate-setup.sh
-   ./docker/validate-setup.sh
-   ```
-
-4. **Start the application**
+3. **Start the application**
    ```bash
    docker-compose up -d
    ```
@@ -123,37 +128,21 @@ EduRisk AI predicts student placement outcomes and generates actionable risk ass
    This will:
    - Start PostgreSQL database
    - Start Redis cache
-   - Run database migrations
-   - Start FastAPI backend on port 8000
-   - Start Next.js frontend on port 3000
+   - Start the FastAPI backend on port 8000
+   - Start the Next.js frontend on port 3000
+   - Train ML models automatically on first boot if model binaries are missing
+   - Initialize database tables during backend startup
 
-5. **Verify deployment**
+4. **Verify deployment**
    ```bash
    # Check service health
    curl http://localhost:8000/api/health
-   
-   # Or run integration tests
-   python test_integration.py
    ```
 
-6. **Access the application**
+5. **Access the application**
    - **Frontend**: http://localhost:3000
    - **API Documentation**: http://localhost:8000/docs
    - **API Alternative Docs**: http://localhost:8000/redoc
-
-### Development Mode
-
-For hot-reload during development:
-
-```bash
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
-```
-
-## 📚 Documentation
-
-### Setup Instructions
-
-See [DOCKER_QUICKSTART.md](DOCKER_QUICKSTART.md) for detailed Docker setup instructions.
 
 ### API Endpoints
 
@@ -246,8 +235,8 @@ curl http://localhost:8000/api/health
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql+asyncpg://...` | Yes |
 | `REDIS_URL` | Redis connection string | `redis://redis:6379/0` | Yes |
 | `LLM_API_KEY` | API key for LLM provider (Groq or Anthropic) | - | No* |
-| `LLM_PROVIDER` | LLM provider to use: `groq` or `anthropic` | `groq` | No* |
-| `API_KEY` | API key for authenticating API requests via X-API-Key header | - | Yes |
+| `LLM_PROVIDER` | LLM provider to use when `LLM_API_KEY` is set | `groq` | No* |
+| `API_KEY` | Optional API key for manual API protection via `X-API-Key` | empty | No |
 | `ML_MODEL_PATH` | Path to ML models directory | `/app/ml/models` | Yes |
 | `SECRET_KEY` | Secret key for JWT tokens and encryption | - | Yes |
 | `CORS_ORIGINS` | Allowed CORS origins | `http://localhost:3000` | No |
@@ -263,9 +252,13 @@ curl http://localhost:8000/api/health
 - Default is `False` for security
 
 **API_KEY Usage**:
-- Required for all API endpoints except `/api/health`, `/docs`, `/redoc`, `/openapi.json`, and `/`
-- Include in requests via `X-API-Key` header
-- Example: `curl -H "X-API-Key: your_api_key_here" http://localhost:8000/api/predict`
+- For the hackathon UI demo, leave `API_KEY` unset so the frontend can authenticate with JWT only.
+- If you set `API_KEY`, manual API requests must include it via `X-API-Key`.
+- Public endpoints remain accessible without it: `/`, `/api/health`, `/api/auth/login`, `/api/auth/refresh`, `/docs`, `/redoc`, `/openapi.json`
+
+**Authentication Flow**:
+- Frontend users log in at `/login` with the demo credentials listed above.
+- Protected UI/API flows use JWT bearer authentication after login.
 
 #### Frontend Configuration
 
@@ -341,19 +334,16 @@ CREATE TABLE audit_logs (
 ### Running Tests
 
 ```bash
-# Backend unit tests
-cd backend
-pytest
+# Backend and API tests
+pytest backend/tests -v
 
-# Backend integration tests
-pytest test_endpoints.py
+# ML pipeline tests
+pytest ml -v
 
-# Full integration test
-python test_integration.py
-
-# Frontend tests
+# Frontend checks
 cd frontend
-npm test
+npm run lint
+npm run type-check
 ```
 
 ### Database Migrations
@@ -376,8 +366,11 @@ alembic downgrade -1
 # Generate synthetic data
 python ml/data/generate_synthetic.py
 
-# Train models
-python ml/pipeline/train.py
+# Train all models
+python -m ml.pipeline.train_all
+
+# Faster local bootstrap option
+python -m ml.pipeline.train_quick
 
 # Run bias audit
 python ml/pipeline/bias_audit.py
