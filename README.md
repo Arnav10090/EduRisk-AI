@@ -513,20 +513,6 @@ docker-compose logs -f redis
 
 This project was built for the TenzorX 2026 Poonawalla Fincorp National AI Hackathon.
 
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- **TenzorX 2026** - Poonawalla Fincorp National AI Hackathon
-- **XGBoost** - Gradient boosting framework
-- **SHAP** - Explainable AI library
-- **FastAPI** - Modern Python web framework
-- **Next.js** - React framework
-- **Groq** - Fast LLM inference API
-- **Anthropic** - Claude AI API
-
 ## 📞 Support
 
 For issues and questions:
