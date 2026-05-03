@@ -144,6 +144,152 @@ After the stack starts:
    - **API Documentation**: http://localhost:8000/docs
    - **API Alternative Docs**: http://localhost:8000/redoc
 
+### Local Setup (Without Docker)
+
+Use this path if you want to run the backend and frontend directly on your machine instead of inside Docker.
+
+#### Local Prerequisites
+
+- **Python** `3.11`
+- **Node.js** `20+`
+- **PostgreSQL** `16` running locally
+- **Redis** `7` optional for rate limiting; if omitted, the app still runs and rate limiting is disabled automatically
+
+#### 1. Clone the repository
+
+```bash
+git clone <repository-url>
+cd edurisk-ai
+```
+
+#### 2. Configure backend environment
+
+Create a root `.env` file from the project template:
+
+```bash
+cp .env.example .env
+```
+
+Use local values similar to:
+
+```env
+DATABASE_URL=postgresql+asyncpg://edurisk:edurisk_password@localhost:5432/edurisk_db
+REDIS_URL=redis://localhost:6379/0
+ML_MODEL_PATH=./ml/models
+SECRET_KEY=your_secret_key_here_change_in_production
+
+# Leave API_KEY empty for local UI testing unless you explicitly want X-API-Key protection
+API_KEY=
+
+DEBUG=True
+LOG_LEVEL=INFO
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+
+# Optional LLM integration
+# LLM_API_KEY=your_provider_key_here
+# LLM_PROVIDER=anthropic
+```
+
+Notes:
+
+- If Redis is not running locally, you can leave `REDIS_URL` unset and the backend will continue without rate limiting.
+- The repo does not include trained `.pkl` model binaries by default. Train them locally before first serious use, or let the Docker backend train them automatically in Docker mode.
+
+#### 3. Configure frontend environment
+
+Create `frontend/.env.local`:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_APP_NAME=EduRisk AI
+NEXT_PUBLIC_APP_VERSION=1.0.0
+NEXT_PUBLIC_ENABLE_ANALYTICS=false
+NEXT_PUBLIC_ENABLE_DEBUG=true
+```
+
+#### 4. Install backend dependencies
+
+Windows PowerShell:
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+macOS/Linux:
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+#### 5. Create the local database
+
+Create a PostgreSQL database named `edurisk_db` and ensure the username/password in `.env` match your local PostgreSQL setup.
+
+Then initialize the schema from the project root:
+
+```bash
+python docker/init-db.py
+```
+
+If you prefer migrations instead of table creation:
+
+```bash
+cd backend
+alembic upgrade head
+cd ..
+```
+
+#### 6. Train local ML models
+
+From the project root:
+
+```bash
+python ml/data/generate_synthetic.py
+python -m ml.pipeline.train_all
+```
+
+For a faster local bootstrap:
+
+```bash
+python -m ml.pipeline.train_quick
+```
+
+#### 7. Install frontend dependencies
+
+```bash
+cd frontend
+npm install
+cd ..
+```
+
+#### 8. Run the backend
+
+From the project root:
+
+```bash
+uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+#### 9. Run the frontend
+
+In a separate terminal:
+
+```bash
+cd frontend
+npm run dev
+```
+
+#### 10. Access the application
+
+- **Frontend**: http://localhost:3000
+- **API Docs**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/api/health
+- **Demo login**: `demo` / `demo@1234`
+
 ### API Endpoints
 
 #### Prediction Endpoints
