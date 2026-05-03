@@ -1,22 +1,22 @@
 {
   "version": "1.0.0",
-  "training_date": "2026-05-02T23:16:32.474050",
+  "training_date": "2026-05-03T17:23:23.352508",
   "models": {
     "placement_3m": {
       "type": "XGBoostClassifier",
       "file": "placement_model_3m.pkl",
       "metrics": {
-        "auc_roc": 0.8260121462395611,
-        "f1": 0.8636668905305575,
-        "precision": 0.8243589743589743,
-        "recall": 0.9069111424541608
+        "auc_roc": 0.8267367523107422,
+        "f1": 0.8632707774798928,
+        "precision": 0.822477650063857,
+        "recall": 0.9083215796897038
       }
     },
     "placement_6m": {
       "type": "XGBoostClassifier",
       "file": "placement_model_6m.pkl",
       "metrics": {
-        "auc_roc": 0.8910386361750304,
+        "auc_roc": 0.8888157816741947,
         "f1": 0.9536987759446514,
         "precision": 0.9218106995884774,
         "recall": 0.9878721058434399
@@ -26,10 +26,10 @@
       "type": "XGBoostClassifier",
       "file": "placement_model_12m.pkl",
       "metrics": {
-        "auc_roc": 0.9255437813720021,
-        "f1": 0.988342625443487,
-        "precision": 0.9798994974874372,
-        "recall": 0.9969325153374233
+        "auc_roc": 0.922708681911136,
+        "f1": 0.9878296146044625,
+        "precision": 0.9798792756539235,
+        "recall": 0.9959100204498977
       }
     },
     "salary": {
